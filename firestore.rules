@@ -101,14 +101,15 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['matricula', 'nome', 'senha', 'role', 'primeiro_acesso', 'ord', 'created_at']) &&
+      return hasOnlyAllowedFields(['matricula', 'nome', 'senha', 'role', 'primeiro_acesso', 'ord', 'created_at', 'unidade']) &&
              data.matricula is string && data.matricula.size() > 0 &&
              data.nome is string && data.nome.size() > 0 &&
              data.senha is string && data.senha.size() >= 5 &&
              data.role in ['ADMIN', 'OPERATOR'] &&
              (data.primeiro_acesso is bool) &&
              (data.ord is int) &&
-             (data.created_at is timestamp);
+             (data.created_at is timestamp) &&
+             (data.unidade in ['5° BPM', '5°BPM-Sede', '2ª CIA - Rio Verde', '3° Pelotão - Alcinópolis', '2° Pelotão - Pedro Gomes'] || !('unidade' in data));
     }
 
     function isValidIndividual(data) {

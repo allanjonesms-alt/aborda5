@@ -12,6 +12,7 @@ export interface User {
   role: UserRole;
   primeiro_acesso: boolean;
   ord?: number;
+  unidade?: string;
 }
 
 export interface Shift {

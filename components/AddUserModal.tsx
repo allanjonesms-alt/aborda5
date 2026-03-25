@@ -15,7 +15,8 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
     nome: '',
     senha: '',
     role: UserRole.OPERATOR,
-    ord: 0
+    ord: 0,
+    unidade: ''
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +53,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
         senha: formData.senha,
         role: formData.role,
         ord: formData.ord,
+        unidade: formData.unidade.toUpperCase(),
         primeiro_acesso: false,
         created_at: new Date().toISOString()
       });
@@ -72,7 +74,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md">
       <div className="bg-white border border-navy-100 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className="bg-navy-50 p-6 border-b border-navy-100 flex justify-between items-center">
+        <div className="bg-navy-50 p-4 border-b border-navy-100 flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <div className="bg-navy-900 p-2 rounded-xl shadow-lg">
               <i className="fas fa-user-plus text-white"></i>
@@ -84,7 +86,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           <div>
             <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2 ml-1">Nome Completo</label>
             <input 
@@ -121,6 +123,23 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
           </div>
 
           <div>
+            <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2 ml-1">Unidade</label>
+            <select 
+              required
+              className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
+              value={formData.unidade}
+              onChange={e => setFormData(prev => ({...prev, unidade: e.target.value}))}
+            >
+              <option value="">Selecione a Unidade</option>
+              <option value="5° BPM">5° BPM</option>
+              <option value="5°BPM-Sede">5°BPM-Sede</option>
+              <option value="2ª CIA - Rio Verde">2ª CIA - Rio Verde</option>
+              <option value="3° Pelotão - Alcinópolis">3° Pelotão - Alcinópolis</option>
+              <option value="2° Pelotão - Pedro Gomes">2° Pelotão - Pedro Gomes</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2 ml-1">Senha Inicial</label>
             <input 
               type="password" 
@@ -151,7 +170,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
             </div>
           )}
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-4 pt-2">
             <button 
               type="button" 
               onClick={onClose} 

@@ -19,65 +19,6 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isBatchRegistering, setIsBatchRegistering] = useState(false);
-
-  const handleBatchRegistration = async () => {
-    console.log('Iniciando cadastro em lote...');
-    setIsBatchRegistering(true);
-    console.log('Estado isBatchRegistering definido como true.');
-
-    const usersToRegister = [
-      { matricula: '93704021', nome: 'ST Amaral', senha: '@Amaral123' },
-      { matricula: '123750021', nome: '2° Sgt Naira', senha: '@Naira123' },
-      { matricula: '119905021', nome: '3° Sgt Martins', senha: '@Martins123' },
-      { matricula: '64219024', nome: '3° Sgt Torres', senha: '@Torres123' },
-      { matricula: '124200021', nome: 'Cb Fabio', senha: '@Fabio123' },
-      { matricula: '100905022', nome: 'Cb Vedoja', senha: '@Vedoja123' },
-      { matricula: '425037021', nome: 'Cb Joice', senha: '@Joice123' },
-      { matricula: '425074021', nome: 'Cb Romario', senha: '@Romario123' },
-      { matricula: '426882021', nome: 'Cb Juary', senha: '@Juary123' },
-      { matricula: '426880021', nome: 'Cb De Paula', senha: '@DePaula123' },
-      { matricula: '436001021', nome: 'Sd Cleison', senha: '@Cleison123' },
-      { matricula: '483905021', nome: 'Sd Julio Cesar', senha: '@JulioCesar123' },
-      { matricula: '490374021', nome: 'Sd Conceição', senha: '@Conceição123' },
-      { matricula: '490424021', nome: 'Sd Patrik', senha: '@Patrik123' },
-      { matricula: '490464021', nome: 'Sd Adriana', senha: '@Adriana123' },
-      { matricula: '509197021', nome: 'Sd Gean', senha: '@Gean123' },
-      { matricula: '509157021', nome: 'Sd Maxwell', senha: '@Maxwell123' },
-      { matricula: '814425021', nome: 'Sd Teles', senha: '@Teles123' },
-      { matricula: '814038021', nome: 'Sd Ana Carolina', senha: '@AnaCarolina123' },
-      { matricula: '814719021', nome: 'Sd Paniago', senha: '@Paniago123' }
-    ];
-
-    try {
-      const batch = writeBatch(db);
-      let currentOrd = 2;
-
-      usersToRegister.forEach((u) => {
-        const userRef = doc(collection(db, 'users'));
-        batch.set(userRef, {
-          matricula: u.matricula,
-          nome: u.nome,
-          senha: u.senha,
-          role: UserRole.OPERATOR,
-          primeiro_acesso: true,
-          ord: currentOrd++,
-          created_at: serverTimestamp()
-        });
-      });
-
-      await batch.commit();
-      console.log('Batch commit realizado com sucesso!');
-      alert('Cadastro em lote realizado com sucesso!');
-      fetchUsers();
-    } catch (err: any) {
-      console.error('Erro no cadastro em lote:', err);
-      handleFirestoreError(err, OperationType.WRITE, 'users_batch');
-      alert('Erro ao cadastrar em lote: ' + err.message);
-    } finally {
-      setIsBatchRegistering(false);
-    }
-  };
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -141,7 +82,8 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
         nome: editingUser.nome,
         matricula: editingUser.matricula,
         role: editingUser.role,
-        ord: editingUser.ord
+        ord: editingUser.ord,
+        unidade: editingUser.unidade || ''
       });
 
       setEditingUser(null);
@@ -189,13 +131,6 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               className="bg-navy-600 hover:bg-navy-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <i className="fas fa-user-plus"></i> Novo Operador
-            </button>
-            <button 
-              onClick={handleBatchRegistration}
-              disabled={isBatchRegistering}
-              className="bg-forest-600 hover:bg-forest-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              {isBatchRegistering ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-users"></i>} Cadastro em Lote
             </button>
 
         </div>
@@ -265,12 +200,12 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
       {editingUser && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md">
           <div className="bg-white border border-navy-100 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="bg-navy-600 p-6 border-b border-navy-500 flex justify-between items-center">
+            <div className="bg-navy-600 p-4 border-b border-navy-500 flex justify-between items-center">
               <h3 className="text-white font-black uppercase tracking-tighter">Editar Operador</h3>
               <button onClick={() => setEditingUser(null)} className="text-navy-400 hover:text-white"><i className="fas fa-times text-xl"></i></button>
             </div>
             
-            <form onSubmit={handleUpdateUser} className="p-8 space-y-6">
+            <form onSubmit={handleUpdateUser} className="p-5 space-y-4">
               <div>
                 <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Nome Completo</label>
                 <input 
@@ -303,6 +238,22 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               </div>
 
               <div>
+                <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Unidade</label>
+                <select 
+                  value={editingUser.unidade || ''} 
+                  onChange={e => setEditingUser({...editingUser, unidade: e.target.value})}
+                  className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
+                >
+                  <option value="">Selecione a Unidade</option>
+                  <option value="5° BPM">5° BPM</option>
+                  <option value="5°BPM-Sede">5°BPM-Sede</option>
+                  <option value="2ª CIA - Rio Verde">2ª CIA - Rio Verde</option>
+                  <option value="3° Pelotão - Alcinópolis">3° Pelotão - Alcinópolis</option>
+                  <option value="2° Pelotão - Pedro Gomes">2° Pelotão - Pedro Gomes</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Cargo / Perfil</label>
                 <select 
                   value={editingUser.role} 
@@ -314,7 +265,7 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
                 </select>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4 pt-2">
                 <button 
                   type="button" 
                   onClick={() => setEditingUser(null)}
