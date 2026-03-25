@@ -1,0 +1,283 @@
+
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user (police officer)",
+      "type": "object",
+      "properties": {
+        "matricula": {
+          "type": "string",
+          "description": "Officer ID number"
+        },
+        "nome": {
+          "type": "string",
+          "description": "Officer name"
+        },
+        "senha": {
+          "type": "string",
+          "description": "Officer password"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["ADMIN", "OPERATOR"],
+          "description": "Officer role"
+        },
+        "primeiro_acesso": {
+          "type": "boolean",
+          "description": "Whether the officer has completed their first access"
+        },
+        "ord": {
+          "type": "integer",
+          "description": "Order for display"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["matricula", "nome", "senha", "role"]
+    },
+    "Individual": {
+      "title": "Individual",
+      "description": "Person approached or registered in the system",
+      "type": "object",
+      "properties": {
+        "nome": {
+          "type": "string",
+          "description": "Full name"
+        },
+        "alcunha": {
+          "type": "string",
+          "description": "Nickname"
+        },
+        "documento": {
+          "type": "string",
+          "description": "ID document number"
+        },
+        "data_nascimento": {
+          "type": "string",
+          "format": "date",
+          "description": "Birth date"
+        },
+        "mae": {
+          "type": "string",
+          "description": "Mother's name"
+        },
+        "endereco": {
+          "type": "string",
+          "description": "Address"
+        },
+        "faccao": {
+          "type": "string",
+          "description": "Criminal faction affiliation"
+        },
+        "observacao": {
+          "type": "string",
+          "description": "General observations"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["nome"]
+    },
+    "IndividualPhoto": {
+      "title": "IndividualPhoto",
+      "description": "Photo of an individual",
+      "type": "object",
+      "properties": {
+        "individuo_id": {
+          "type": "string",
+          "description": "Reference to the individual"
+        },
+        "path": {
+          "type": "string",
+          "description": "Storage path or URL"
+        },
+        "is_primary": {
+          "type": "boolean",
+          "description": "Whether this is the main photo"
+        },
+        "sort_order": {
+          "type": "integer",
+          "description": "Order for display"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User who uploaded the photo"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["individuo_id", "path"]
+    },
+    "IndividualAttachment": {
+      "title": "IndividualAttachment",
+      "description": "Attachment for an individual",
+      "type": "object",
+      "properties": {
+        "individuo_id": {
+          "type": "string",
+          "description": "Reference to the individual"
+        },
+        "nome_arquivo": {
+          "type": "string",
+          "description": "File name"
+        },
+        "tipo_mime": {
+          "type": "string",
+          "description": "MIME type"
+        },
+        "path": {
+          "type": "string",
+          "description": "Storage path or URL (base64 for now)"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User who uploaded the attachment"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["individuo_id", "nome_arquivo", "path"]
+    },
+    "Approach": {
+      "title": "Approach",
+      "description": "Police approach record",
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of the approach"
+        },
+        "horario": {
+          "type": "string",
+          "description": "Time of the approach"
+        },
+        "local": {
+          "type": "string",
+          "description": "Location of the approach"
+        },
+        "relatorio": {
+          "type": "string",
+          "description": "Detailed report"
+        },
+        "objetos_apreendidos": {
+          "type": "string",
+          "description": "Items seized"
+        },
+        "resultado": {
+          "type": "string",
+          "description": "Outcome of the approach"
+        },
+        "individuo_nome": {
+          "type": "string",
+          "description": "Name of the individual approached"
+        },
+        "individuo_id": {
+          "type": "string",
+          "description": "Reference to the individual record"
+        },
+        "foto_path": {
+          "type": "string",
+          "description": "Path to a photo of the approach"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["data", "horario", "local"]
+    },
+    "VtrService": {
+      "title": "VtrService",
+      "description": "Patrol car shift/service record",
+      "type": "object",
+      "properties": {
+        "comandante": {
+          "type": "string",
+          "description": "Commander name"
+        },
+        "motorista": {
+          "type": "string",
+          "description": "Driver name"
+        },
+        "patrulheiro_1": {
+          "type": "string",
+          "description": "Patrol officer 1"
+        },
+        "patrulheiro_2": {
+          "type": "string",
+          "description": "Patrol officer 2"
+        },
+        "horario_inicio": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start time"
+        },
+        "horario_fim": {
+          "type": "string",
+          "format": "date-time",
+          "description": "End time"
+        },
+        "criado_por": {
+          "type": "string",
+          "description": "User ID who started the service"
+        },
+        "encerrado_por_nome": {
+          "type": "string",
+          "description": "User name who ended the service"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ATIVO", "ENCERRADO"],
+          "description": "Service status"
+        }
+      },
+      "required": ["comandante", "motorista", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "System users"
+    },
+    "/individuals/{individualId}": {
+      "schema": "Individual",
+      "description": "Individuals registered"
+    },
+    "/individual_photos/{photoId}": {
+      "schema": "IndividualPhoto",
+      "description": "Photos of individuals"
+    },
+    "/individual_attachments/{attachmentId}": {
+      "schema": "IndividualAttachment",
+      "description": "Attachments for individuals"
+    },
+    "/approaches/{approachId}": {
+      "schema": "Approach",
+      "description": "Approach records"
+    },
+    "/vtr_services/{serviceId}": {
+      "schema": "VtrService",
+      "description": "Patrol car services"
+    }
+  }
+}

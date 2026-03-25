@@ -1,0 +1,9 @@
+{
+  "name": "SGA5 - Sistema de Gerenciamento de Abordagem do 5° BPM",
+  "description": "Sistema de registro, consulta e gerenciamento de abordagens policiais, indivíduos e galeria de registros fotográficos.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

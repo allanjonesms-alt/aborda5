@@ -1,0 +1,267 @@
+
+import React, { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { collection, query, where, orderBy, limit, getDocs, startAfter, getCountFromServer } from 'firebase/firestore';
+import AddIndividualModal from '../components/AddIndividualModal';
+import ManagePhotosModal from '../components/ManagePhotosModal';
+import EditIndividualModal from '../components/EditIndividualModal';
+import { Individual, User, PhotoRecord } from '../types';
+
+interface IndividualsListProps {
+  user: User | null;
+}
+
+const ITEMS_PER_PAGE = 12;
+
+const IndividualSkeleton = () => (
+  <div className="bg-white border border-navy-100 rounded-3xl h-[110px] sm:h-[400px] animate-pulse overflow-hidden flex flex-row sm:flex-col">
+    <div className="w-28 sm:w-full h-full sm:h-[230px] bg-gray-100"></div>
+    <div className="flex-1 p-4 sm:p-5 space-y-3">
+      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+      <div className="h-2 bg-gray-100 rounded w-1/2"></div>
+      <div className="hidden sm:block h-10 bg-gray-200 rounded-xl mt-4"></div>
+    </div>
+  </div>
+);
+
+const IndividualCard = memo(({ ind, onEdit, onManagePhotos }: { 
+  ind: Individual, 
+  onEdit: (i: Individual) => void, 
+  onManagePhotos: (i: Individual) => void 
+}) => {
+  const primaryPhoto = ind.fotos_individuos?.find(p => p.is_primary)?.path || ind.fotos_individuos?.[0]?.path;
+
+  return (
+    <div 
+      onClick={() => onEdit(ind)} 
+      className="bg-white border border-navy-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg hover:border-forest-600/50 cursor-pointer flex flex-row sm:flex-col group transition-all h-[110px] sm:h-[420px] hover:shadow-forest-600/10 active:scale-[0.98]"
+    >
+      <div className="w-28 sm:w-full h-full sm:h-[230px] bg-gray-50 relative flex-shrink-0 overflow-hidden">
+        {primaryPhoto ? (
+          <img 
+            src={primaryPhoto} 
+            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" 
+            alt={ind.nome} 
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center opacity-20">
+            <i className="fas fa-user-secret text-4xl sm:text-7xl mb-0 sm:mb-4 text-navy-300"></i>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-navy-950/20 via-transparent to-transparent opacity-60"></div>
+      </div>
+
+      <div className="flex-1 p-3 sm:p-5 flex flex-col justify-between bg-white border-l sm:border-l-0 sm:border-t border-navy-100 min-w-0">
+        <div className="space-y-2 sm:space-y-3 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+            <h3 className="text-[10px] sm:text-xs font-black text-navy-950 uppercase truncate max-w-[85%] sm:max-w-[70%] leading-none group-hover:text-forest-500 transition-colors">
+              {ind.nome}
+            </h3>
+            <div className="flex gap-1">
+              {ind.faccao && (
+                <span className="text-[6px] sm:text-[7px] font-black px-1 sm:py-0.5 bg-red-600/10 text-red-600 rounded uppercase border border-red-500/30">
+                  {ind.faccao}
+                </span>
+              )}
+              {ind.alcunha && (
+                <span className="text-[6px] sm:text-[7px] font-black px-1 sm:py-0.5 bg-forest-600/10 text-forest-600 rounded uppercase border border-forest-500/30">
+                  "{ind.alcunha}"
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-2 sm:pt-3 border-t border-navy-100">
+            <div className="flex flex-col gap-0.5 sm:gap-1">
+              <span className="text-[6px] sm:text-[8px] text-navy-400 font-black uppercase tracking-widest">Nascimento</span>
+              <span className="text-[8px] sm:text-[10px] text-navy-700 font-bold">
+                {ind.data_nascimento ? new Date(ind.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/I'}
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5 sm:gap-1 overflow-hidden">
+              <span className="text-[6px] sm:text-[8px] text-navy-400 font-black uppercase tracking-widest">Doc</span>
+              <span className="text-[8px] sm:text-[10px] text-navy-700 font-bold truncate">
+                {ind.documento || 'N/I'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button 
+          onClick={(e) => { e.stopPropagation(); onManagePhotos(ind); }} 
+          className="mt-2 sm:mt-4 h-7 sm:h-10 bg-gray-50 hover:bg-navy-600 text-navy-500 hover:text-white rounded-lg sm:rounded-xl flex items-center justify-center border border-navy-100 hover:border-navy-500 transition-all shadow-sm uppercase text-[7px] sm:text-[9px] font-black w-full"
+        >
+          <i className="fas fa-camera-retro mr-1.5 sm:mr-2"></i> <span className="hidden sm:inline">Fotos</span><span className="sm:hidden">Mídia</span>
+        </button>
+      </div>
+    </div>
+  );
+});
+
+const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
+  const [individuals, setIndividuals] = useState<Individual[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [editingIndividual, setEditingIndividual] = useState<Individual | null>(null);
+  const [managingPhotosIndividual, setManagingPhotosIndividual] = useState<Individual | null>(null);
+  const [isAddingIndividual, setIsAddingIndividual] = useState(false);
+  
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const lastElementRef = useCallback((node: HTMLDivElement) => {
+    if (isLoadingMore || isLoading) return;
+    if (observerRef.current) observerRef.current.disconnect();
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) fetchIndividuals(false, debouncedSearch);
+    }, { threshold: 0.1 });
+    if (node) observerRef.current.observe(node);
+  }, [isLoadingMore, isLoading, hasMore, debouncedSearch]);
+
+  const fetchIndividuals = useCallback(async (isInitial: boolean = false, searchTerm: string = '') => {
+    if (isInitial) {
+      setIsLoading(true);
+      setLastDoc(null);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    try {
+      const individualsRef = collection(db, 'individuals');
+      let q;
+
+      if (isInitial) {
+        const countSnapshot = await getCountFromServer(individualsRef);
+        setTotalCount(countSnapshot.data().count);
+      }
+
+      if (searchTerm.trim()) {
+        const s = searchTerm.trim();
+        q = query(
+          individualsRef,
+          where('nome', '>=', s),
+          where('nome', '<=', s + '\uf8ff'),
+          orderBy('nome'),
+          limit(ITEMS_PER_PAGE)
+        );
+      } else {
+        q = query(
+          individualsRef,
+          orderBy('nome'),
+          limit(ITEMS_PER_PAGE)
+        );
+      }
+
+      if (!isInitial && lastDoc) {
+        q = query(q, startAfter(lastDoc));
+      }
+
+      const querySnapshot = await getDocs(q);
+      
+      const newIndividuals: Individual[] = [];
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data();
+        
+        // Fetch photos for this individual
+        const photosRef = collection(db, 'individual_photos');
+        const photosQ = query(photosRef, where('individuo_id', '==', docSnapshot.id));
+        const photosSnapshot = await getDocs(photosQ);
+        
+        const photos = photosSnapshot.docs.map(pDoc => ({ id: pDoc.id, ...pDoc.data() } as PhotoRecord));
+
+        newIndividuals.push({
+          id: docSnapshot.id,
+          ...data,
+          fotos_individuos: photos
+        } as Individual);
+      }
+
+      setIndividuals(prev => isInitial ? newIndividuals : [...prev, ...newIndividuals]);
+      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE);
+    } catch (err) {
+      console.error('Error fetching individuals:', err);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [lastDoc]);
+
+  useEffect(() => {
+    fetchIndividuals(true, debouncedSearch);
+  }, [debouncedSearch]);
+
+  const handleSave = () => {
+    setIndividuals([]);
+    fetchIndividuals(true, debouncedSearch);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto py-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6 px-4">
+        <div className="flex items-center space-x-5">
+          <div className="bg-forest-600 p-4 rounded-2xl shadow-xl shadow-forest-600/20">
+            <i className="fas fa-user-shield text-white text-2xl"></i>
+          </div>
+          <div>
+            <h2 className="text-3xl font-black text-navy-950 uppercase tracking-tighter leading-none">Indivíduos</h2>
+            <p className="text-[10px] text-navy-400 font-black uppercase tracking-widest mt-2">
+              {isLoading ? 'Consultando Inteligência...' : `${totalCount} Registros Ativos`}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+          <div className="relative flex-1 sm:w-80">
+            <input 
+              type="text" 
+              placeholder="Pesquisar registro..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              className="w-full bg-white border border-navy-200 text-navy-950 pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-navy-500 transition-all font-bold text-sm shadow-sm" 
+            />
+            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-navy-300"></i>
+          </div>
+          <button 
+            onClick={() => setIsAddingIndividual(true)} 
+            className="bg-navy-600 hover:bg-navy-500 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3"
+          >
+            <i className="fas fa-plus"></i> Novo Cadastro
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 px-4">
+        {isLoading && individuals.length === 0 ? (
+          Array.from({ length: 12 }).map((_, i) => <IndividualSkeleton key={i} />)
+        ) : (
+          <>
+            {individuals.map((ind, index) => (
+              <div key={ind.id} ref={index === individuals.length - 1 ? lastElementRef : null}>
+                <IndividualCard ind={ind} onEdit={setEditingIndividual} onManagePhotos={setManagingPhotosIndividual} />
+              </div>
+            ))}
+            {isLoadingMore && Array.from({ length: 6 }).map((_, i) => <IndividualSkeleton key={i} />)}
+          </>
+        )}
+      </div>
+
+      {isAddingIndividual && <AddIndividualModal currentUser={user} onClose={() => setIsAddingIndividual(false)} onSave={handleSave} />}
+      {editingIndividual && <EditIndividualModal individual={editingIndividual} currentUser={user} onClose={() => setEditingIndividual(null)} onSave={() => { handleSave(); setEditingIndividual(null); }} />}
+      {managingPhotosIndividual && <ManagePhotosModal currentUser={user} individual={managingPhotosIndividual} onClose={() => setManagingPhotosIndividual(null)} onSave={handleSave} />}
+    </div>
+  );
+};
+
+export default IndividualsList;

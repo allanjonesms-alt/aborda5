@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SGA5 - Sistema de Gerenciamento de Abordagem do 5° BPM</title>
+    <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1mMEB81-W8s9aTgY1UFmQ8tZ7MeNAKqqB" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              navy: {
+                50: '#e6ebf9',
+                100: '#ccd7f3',
+                200: '#99afe7',
+                300: '#6687db',
+                400: '#335fcf',
+                500: '#0033cc',
+                600: '#0029a3',
+                700: '#001f7a',
+                800: '#001452',
+                900: '#000a29',
+                950: '#000514',
+              },
+              forest: {
+                50: '#e9f4e9',
+                100: '#d2e9d2',
+                200: '#a5d3a5',
+                300: '#78bd78',
+                400: '#4ba74b',
+                500: '#228B22',
+                600: '#1b6f1b',
+                700: '#145314',
+                800: '#0d370d',
+                900: '#071c07',
+                950: '#030e03',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
+  }
+}
+</script>
+  </head>
+  <body class="bg-white text-navy-950 min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>

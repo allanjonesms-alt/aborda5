@@ -1,0 +1,175 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - matricula: string (required) - Officer ID number
+    //   - nome: string (required) - Officer name
+    //   - senha: string (required) - Officer password
+    //   - role: string (required, enum: ['ADMIN', 'OPERATOR']) - Officer role
+    //   - primeiro_acesso: bool (optional) - Whether the officer has completed their first access
+    //   - ord: int (optional) - Order for display
+    //   - created_at: timestamp (optional) - Creation timestamp
+    //
+    // Collection: individuals
+    // Document ID: individualId
+    // Fields:
+    //   - nome: string (required) - Full name
+    //   - alcunha: string (optional) - Nickname
+    //   - documento: string (optional) - ID document number
+    //   - data_nascimento: string (optional, format: date) - Birth date
+    //   - mae: string (optional) - Mother's name
+    //   - endereco: string (optional) - Address
+    //   - faccao: string (optional) - Criminal faction affiliation
+    //   - observacao: string (optional) - General observations
+    //   - created_at: timestamp (optional) - Creation timestamp
+    //   - updated_at: timestamp (optional) - Last update timestamp
+    //
+    // Collection: individual_photos
+    // Document ID: photoId
+    // Fields:
+    //   - individuo_id: string (required) - Reference to the individual
+    //   - path: string (required) - Storage path or URL
+    //   - is_primary: bool (optional) - Whether this is the main photo
+    //   - sort_order: int (optional) - Order for display
+    //   - created_by: string (optional) - User who uploaded the photo
+    //   - created_at: timestamp (optional) - Creation timestamp
+    //
+    // Collection: approaches
+    // Document ID: approachId
+    // Fields:
+    //   - data: string (required, format: date) - Date of the approach
+    //   - horario: string (required) - Time of the approach
+    //   - local: string (required) - Location of the approach
+    //   - relatorio: string (optional) - Detailed report
+    //   - objetos_apreendidos: string (optional) - Items seized
+    //   - resultado: string (optional) - Outcome of the approach
+    //   - individuo_nome: string (optional) - Name of the individual approached
+    //   - individuo_id: string (optional) - Reference to the individual record
+    //   - foto_path: string (optional) - Path to a photo of the approach
+    //   - created_at: timestamp (optional) - Creation timestamp
+    //
+    // Collection: vtr_services
+    // Document ID: serviceId
+    // Fields:
+    //   - comandante: string (required) - Commander name
+    //   - motorista: string (required) - Driver name
+    //   - patrulheiro_1: string (optional) - Patrol officer 1
+    //   - patrulheiro_2: string (optional) - Patrol officer 2
+    //   - horario_inicio: timestamp (optional) - Start time
+    //   - horario_fim: timestamp (optional) - End time
+    //   - criado_por: string (optional) - User ID who started the service
+    //   - encerrado_por_nome: string (optional) - User name who ended the service
+    //   - status: string (required, enum: ['ATIVO', 'ENCERRADO']) - Service status
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN') ||
+          (request.auth.token.email == "allanjonesms@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['matricula', 'nome', 'senha', 'role', 'primeiro_acesso', 'ord', 'created_at']) &&
+             data.matricula is string && data.matricula.size() > 0 &&
+             data.nome is string && data.nome.size() > 0 &&
+             data.senha is string && data.senha.size() >= 5 &&
+             data.role in ['ADMIN', 'OPERATOR'] &&
+             (data.primeiro_acesso is bool) &&
+             (data.ord is int) &&
+             (data.created_at is timestamp);
+    }
+
+    function isValidIndividual(data) {
+      return hasOnlyAllowedFields(['nome', 'alcunha', 'documento', 'data_nascimento', 'mae', 'endereco', 'faccao', 'observacao', 'created_at', 'updated_at']) &&
+             data.nome is string && data.nome.size() > 0 && data.nome.size() < 200;
+    }
+
+    function isValidPhoto(data) {
+      return hasOnlyAllowedFields(['individuo_id', 'path', 'is_primary', 'sort_order', 'created_by', 'created_at']) &&
+             data.individuo_id is string && data.path is string;
+    }
+
+    function isValidApproach(data) {
+      return hasOnlyAllowedFields(['data', 'horario', 'local', 'relatorio', 'objetos_apreendidos', 'resultado', 'individuo_nome', 'individuo_id', 'foto_path', 'created_at']) &&
+             data.data is string && data.horario is string && data.local is string;
+    }
+
+    function isValidVtrService(data) {
+      return hasOnlyAllowedFields(['comandante', 'motorista', 'patrulheiro_1', 'patrulheiro_2', 'horario_inicio', 'horario_fim', 'criado_por', 'encerrado_por_nome', 'status']) &&
+             data.comandante is string && data.motorista is string && data.status in ['ATIVO', 'ENCERRADO'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /individuals/{individualId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidIndividual(request.resource.data);
+      allow update: if isAuthenticated() && isValidIndividual(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /individual_photos/{photoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPhoto(request.resource.data);
+      allow update: if isAuthenticated() && isValidPhoto(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /approaches/{approachId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidApproach(request.resource.data);
+      allow update: if isAuthenticated() && isValidApproach(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /vtr_services/{serviceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidVtrService(request.resource.data);
+      allow update: if isAuthenticated() && isValidVtrService(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
