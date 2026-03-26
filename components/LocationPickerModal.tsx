@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps } from '../lib/googleMaps';
+import { allowedCities, checkCity } from '../lib/utils';
 
 interface LocationPickerModalProps {
   onClose: () => void;
@@ -115,7 +116,12 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({ onClose, onCo
       if (!geocoder.current) return;
       geocoder.current.geocode({ location: pos }, (results: any, status: any) => {
         if (status === 'OK' && results[0]) {
-          setAddress(results[0].formatted_address);
+          const res = results[0];
+          if (!checkCity(res.address_components || [])) {
+            setAddress(`LOCAL FORA DE ÁREA: ${res.formatted_address}`);
+          } else {
+            setAddress(res.formatted_address);
+          }
         } else {
           console.error("Geocoding falhou:", status);
           setAddress(`Lat: ${pos.lat.toFixed(6)}, Lng: ${pos.lng.toFixed(6)} (Serviço indisponível)`);
@@ -183,7 +189,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({ onClose, onCo
             </button>
             <button 
               onClick={handleConfirm}
-              disabled={isLoading || !!error}
+              disabled={isLoading || !!error || address.includes('FORA DE ÁREA')}
               className="flex-[2] bg-navy-900 hover:bg-navy-800 disabled:opacity-50 text-white font-black py-4 rounded-2xl uppercase text-xs transition-all shadow-lg active:scale-95"
             >
               Confirmar Localização

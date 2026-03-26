@@ -83,6 +83,10 @@ const App: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Force logout to show login screen as requested
+    localStorage.removeItem(STORAGE_KEYS.AUTH);
+    setAuth({ user: null, isAuthenticated: false });
+
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
       if (!user) {
         signInAnonymously(firebaseAuth).catch(console.error);
@@ -139,8 +143,8 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
-  if (auth.user?.primeiro_acesso === false) {
-    return <FirstAccess user={auth.user} onPasswordChanged={handlePasswordChanged} />;
+  if (auth.user?.primeiro_acesso === true) {
+    return <FirstAccess user={auth.user} onPasswordChanged={handlePasswordChanged} onLogout={handleLogout} />;
   }
 
   return (

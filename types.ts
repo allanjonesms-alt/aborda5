@@ -46,6 +46,7 @@ export interface Individual {
   endereco?: string;
   faccao?: string;
   observacao?: string;
+  unidade?: string;
   created_at?: string;
   updated_at?: string;
   fotos_individuos?: PhotoRecord[];

@@ -19,6 +19,40 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const importIndividuals = async () => {
+    console.log('Iniciando importação de indivíduos...');
+    setIsImporting(true);
+    const individualsToImport = [
+      { id: "4aa46513-fcd7-4d0d-af99-29f5785fbbfc", nome: "LUCAS RODRIGUES MACHADO", data_nascimento: "2000-09-03", documento: "061.331.711-46", endereco: "R. Projetada A - Jardim Vaticano, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", faccao: "PCC", mae: "ANA RODRIGUES GOUVEIA" },
+      { id: "ecac965c-ff1d-43cd-bf2a-e7290c372226", nome: "ELIVELTON DE MELO", data_nascimento: "2000-02-17", documento: "074.365.181-27", alcunha: "ZOI DE GATO / EXTERMINADOR", endereco: "R. Ceará - Jardim Semiramis, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", faccao: "PCC", mae: "SANDRA APARECIDA DE MELO" },
+      { id: "71277d24-dd65-45aa-a0b4-fcc86ab983ab", nome: "VINICIUS ARCE DA SILVA", data_nascimento: "1999-07-08", documento: "074.479.741-10", endereco: "R. Araguainha - Vila Rosa Mourao, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", mae: "LEONORA OLMEDO ARCE" },
+      { id: "857e20ea-e98d-46ea-86cf-6def60b60ca1", nome: "RICHARD MATEUS FERNANDES REIS", data_nascimento: "2006-10-23", documento: "076.481.241-65", endereco: "R. Américo de Souza Brito, 124 - Jardim Jose Antonio, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", mae: "JUCELIA MATEUS DA FONSECA SANTOS" },
+      { id: "02623eb7-bb8e-471b-8c3b-c0aa8d857fc9", nome: "JOAO PEDRO MOREL VERA", data_nascimento: "2010-06-27", documento: "083.261.451-30", endereco: "R. A, 51 - Rio Verde de Mato Grosso, MS, 79480-000, Brasil", mae: "MARIA HELENA MOREL" },
+      { id: "8c57f9bb-d7a1-477b-b25a-a7073c80d44f", nome: "DAVID AUGUSTO GOULART ESCOBAR", data_nascimento: "2005-12-22", documento: "067.356.271-99", endereco: "R. Mal. Rondon, 311 - Nova Rio Verde, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", faccao: "PCC", mae: "ELAINE GOULART ESCOBAR" },
+      { id: "5eaf1ca9-670c-40eb-8747-a96c288e970b", nome: "SAVIO DE BRITO ESPINOZA", data_nascimento: "2004-11-16", documento: "110.603.461-92", endereco: "R. Tete Espíndola, 40 - Rio Verde de Mato Grosso, MS, 79480-000, Brasil", mae: "LUCIARA IZABEL DUARTE DE BRITO" },
+      { id: "c8556ddb-1d9f-4431-918d-0234a0570a66", nome: "FELIPE VITORINO DA SILVA", data_nascimento: "2009-02-24", documento: "074.876.321-05", endereco: "R. Ovídio Marçal Júnior, 20 - Santa Terezinha, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", faccao: "PCC", mae: "MARIA DA CONCEICAO SILVA" },
+      { id: "f53b6aee-5915-46f7-a001-83e1e263e8ee", nome: "ISAQUE FERNANDO DE SOUZA TENORIO", data_nascimento: "2005-10-15", documento: "087.253.961-02", endereco: "R. Central - Novo Horizonte, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", faccao: "PCC", mae: "VALDEVINA LEMES DE SOUZA" },
+      { id: "31ebb3f0-b6e3-4d03-97f4-378e4399b186", nome: "WERICK MAIA MACEDO", data_nascimento: "2006-06-04", documento: "072.541.941-56", endereco: "Sócrates Brasileiro - Jardim Alvorada, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", mae: "MARTA CRISTINA PEREIRA MAIA" },
+      { id: "6cc7905d-5bd8-4b6c-ae6b-a20f92e8bbfa", nome: "LUCAS PEREIRA MAIA ORTIZ", data_nascimento: "2003-04-01", documento: "073.718.931-23", endereco: "R. Joaquim Murtinho - Nova Rio Verde, Rio Verde de Mato Grosso - MS, 79480-000, Brasil", mae: "MARTA CRISTINA PEREIRA ORTIZ" }
+    ];
+
+    try {
+      const batch = writeBatch(db);
+      individualsToImport.forEach(ind => {
+        const indRef = doc(db, 'individuals', ind.id);
+        batch.set(indRef, { ...ind, created_at: serverTimestamp(), updated_at: serverTimestamp() });
+      });
+      await batch.commit();
+      console.log('Importação concluída com sucesso!');
+      fetchUsers();
+    } catch (err: any) {
+      console.error('Erro na importação:', err);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -131,6 +165,13 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               className="bg-navy-600 hover:bg-navy-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <i className="fas fa-user-plus"></i> Novo Operador
+            </button>
+            <button 
+              onClick={importIndividuals}
+              disabled={isImporting}
+              className="bg-forest-600 hover:bg-forest-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              {isImporting ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-file-import"></i>} Importar Indivíduos
             </button>
 
         </div>

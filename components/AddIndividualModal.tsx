@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { maskCPF, validateCPF } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
 import { User as AppUser, Individual } from '../types';
 import EditIndividualModal from './EditIndividualModal';
 import { loadGoogleMaps } from '../lib/googleMaps';
@@ -53,9 +53,11 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
   const [isSaving, setIsSaving] = useState(false);
   const [cpfError, setCpfError] = useState(false);
   
-  // Estados para Homônimos
+  // Estados para Homônimos e CPF Duplicado
   const [homonyms, setHomonyms] = useState<any[]>([]);
   const [showHomonymAlert, setShowHomonymAlert] = useState(false);
+  const [cpfDuplicate, setCpfDuplicate] = useState<any>(null);
+  const [showCpfAlert, setShowCpfAlert] = useState(false);
   const [confirmedHomonym, setConfirmedHomonym] = useState(false);
   const [isCheckingHomonym, setIsCheckingHomonym] = useState(false);
   
@@ -72,8 +74,17 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
 
     try {
       const google = (window as any).google;
+      const bounds = {
+        north: -17.4,
+        south: -19.5,
+        east: -53.5,
+        west: -55.0,
+      };
+
       const options = {
         componentRestrictions: { country: "br" },
+        bounds: bounds,
+        strictBounds: true,
         fields: ['formatted_address', 'address_components', 'geometry'],
         types: ['address']
       };
@@ -86,6 +97,14 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
       autocompleteInstance.current.addListener('place_changed', () => {
         const place = autocompleteInstance.current.getPlace();
         if (!place.formatted_address) return;
+
+        if (!checkCity(place.address_components || [])) {
+          alert(`LOCAL FORA DE ÁREA!\n\nAs buscas estão restritas às cidades permitidas:\n${allowedCities.join(', ')}`);
+          if (addressInputRef.current) addressInputRef.current.value = '';
+          setFormData(prev => ({ ...prev, endereco: '' }));
+          return;
+        }
+
         setFormData(prev => ({ ...prev, endereco: place.formatted_address }));
       });
     } catch (err) {
@@ -169,6 +188,7 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
         ...formData,
         nome: formData.nome.toUpperCase(),
         mae: formData.mae?.toUpperCase() || '',
+        unidade: currentUser?.unidade || '',
         created_at: now,
         updated_at: now
       };
@@ -273,8 +293,16 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
         const q = query(collection(db, 'individuals'), where('documento', '==', formData.documento));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-          const existingCpf = querySnapshot.docs[0].data();
-          alert(`ALERTA CRÍTICO: Este CPF já está cadastrado para o indivíduo: ${existingCpf.nome}. Não é permitido duplicar cadastros por CPF.`);
+          const docSnap = querySnapshot.docs[0];
+          const existingCpf = docSnap.data();
+          
+          // Buscar fotos para exibir no modal
+          const photosQ = query(collection(db, 'individual_photos'), where('individuo_id', '==', docSnap.id));
+          const photosSnap = await getDocs(photosQ);
+          const photosData = photosSnap.docs.map(p => p.data());
+          
+          setCpfDuplicate({ id: docSnap.id, ...existingCpf, fotos_individuos: photosData });
+          setShowCpfAlert(true);
           return;
         }
       } catch (err) {
@@ -461,7 +489,7 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
             <div className="p-8 space-y-6">
               <p className="text-navy-600 text-sm font-medium leading-relaxed">
                 Detectamos indivíduos cadastrados com o nome <span className="text-navy-950 font-black">"{formData.nome}"</span>. 
-                Por favor, verifique se the abordado já possui ficha ativa antes de criar um novo cadastro duplicado.
+                Por favor, verifique se o abordado já possui ficha ativa antes de criar um novo cadastro duplicado.
               </p>
 
               <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -506,6 +534,58 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
                   className="flex-1 bg-navy-900 hover:bg-navy-800 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-navy-900/20 transition-all"
                 >
                   Continuar com Novo Cadastro
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ALERTA DE CPF DUPLICADO */}
+      {showCpfAlert && cpfDuplicate && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-red-950/95 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-white border-2 border-red-600 w-full max-w-2xl rounded-[2.5rem] shadow-[0_0_50px_rgba(220,38,38,0.2)] overflow-hidden">
+            <div className="bg-red-600 p-6 flex items-center gap-4">
+              <i className="fas fa-ban text-white text-3xl animate-pulse"></i>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">CPF Já Cadastrado</h3>
+                <p className="text-red-100 text-[10px] font-bold uppercase tracking-widest">Cadastro Bloqueado</p>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <p className="text-navy-950 text-sm font-medium leading-relaxed">
+                O CPF <span className="text-red-600 font-black">{formData.documento}</span> já está vinculado ao indivíduo abaixo. 
+                Não é permitido duplicar cadastros por CPF.
+              </p>
+
+              <div 
+                onClick={() => handleOpenHomonymForEdit(cpfDuplicate)}
+                className="bg-navy-50 border border-navy-100 rounded-2xl p-4 flex items-center gap-4 hover:border-navy-900 group cursor-pointer transition-all"
+              >
+                <div className="w-16 h-16 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-navy-100">
+                  {cpfDuplicate.fotos_individuos?.find((f: any) => f.is_primary)?.path || cpfDuplicate.fotos_individuos?.[0]?.path ? 
+                    <img src={cpfDuplicate.fotos_individuos?.find((f: any) => f.is_primary)?.path || cpfDuplicate.fotos_individuos?.[0]?.path} className="w-full h-full object-cover" /> : 
+                    <i className="fas fa-user-secret text-navy-200 text-2xl flex items-center justify-center h-full"></i>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-navy-950 font-black uppercase text-sm truncate">{cpfDuplicate.nome}</p>
+                    <span className="text-navy-900 text-[9px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity">Visualizar Ficha <i className="fas fa-external-link-alt ml-1"></i></span>
+                  </div>
+                  <div className="flex gap-3 mt-1">
+                    <span className="text-[10px] text-navy-900 font-bold uppercase">Vulgo: {cpfDuplicate.alcunha || 'N/I'}</span>
+                    <span className="text-[10px] text-navy-400 font-bold uppercase">Nascimento: {cpfDuplicate.data_nascimento ? new Date(cpfDuplicate.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/I'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-navy-100">
+                <button 
+                  onClick={() => setShowCpfAlert(false)}
+                  className="w-full bg-navy-900 hover:bg-navy-800 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-navy-900/20 transition-all"
+                >
+                  Entendido
                 </button>
               </div>
             </div>

@@ -70,7 +70,7 @@ const Gallery: React.FC = () => {
         try {
           const photoQ = query(
             collection(db, 'individual_photos'),
-            where('individual_id', '==', ind.id),
+            where('individuo_id', '==', ind.id),
             where('is_primary', '==', true),
             limit(1)
           );
@@ -122,7 +122,7 @@ const Gallery: React.FC = () => {
         const indData = { id: docSnap.id, ...docSnap.data() } as Individual;
         
         // Fetch all photos for the modal
-        const photoQ = query(collection(db, 'individual_photos'), where('individual_id', '==', id));
+        const photoQ = query(collection(db, 'individual_photos'), where('individuo_id', '==', id));
         const photoSnap = await getDocs(photoQ);
         const photos = photoSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         

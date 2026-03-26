@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, orderBy } from 'firebase/firestore';
 import { Individual, User, PhotoRecord, Relationship, Attachment, DBApproach } from '../types';
-import { maskCPF, validateCPF } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
 import { loadGoogleMaps } from '../lib/googleMaps';
 
 interface AttachmentViewerModalProps {
@@ -95,8 +95,17 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
 
     try {
       const google = (window as any).google;
+      const bounds = {
+        north: -17.4,
+        south: -19.5,
+        east: -53.5,
+        west: -55.0,
+      };
+
       const options = {
         componentRestrictions: { country: "br" },
+        bounds: bounds,
+        strictBounds: true,
         fields: ['formatted_address', 'address_components', 'geometry'],
         types: ['address']
       };
@@ -109,6 +118,14 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
       autocompleteInstance.current.addListener('place_changed', () => {
         const place = autocompleteInstance.current.getPlace();
         if (!place.formatted_address) return;
+
+        if (!checkCity(place.address_components || [])) {
+          alert(`LOCAL FORA DE ÁREA!\n\nAs buscas estão restritas às cidades permitidas:\n${allowedCities.join(', ')}`);
+          if (addressInputRef.current) addressInputRef.current.value = '';
+          setFormData(prev => ({ ...prev, endereco: '' }));
+          return;
+        }
+
         setFormData(prev => ({ ...prev, endereco: place.formatted_address }));
       });
     } catch (err) {

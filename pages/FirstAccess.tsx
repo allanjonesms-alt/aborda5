@@ -8,9 +8,10 @@ import TacticalLogo from '../components/TacticalLogo';
 interface FirstAccessProps {
   user: User;
   onPasswordChanged: (updatedUser: User) => void;
+  onLogout: () => void;
 }
 
-const FirstAccess: React.FC<FirstAccessProps> = ({ user, onPasswordChanged }) => {
+const FirstAccess: React.FC<FirstAccessProps> = ({ user, onPasswordChanged, onLogout }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -41,7 +42,7 @@ const FirstAccess: React.FC<FirstAccessProps> = ({ user, onPasswordChanged }) =>
       const userRef = doc(db, 'users', user.id);
       await updateDoc(userRef, { 
         senha: newPassword,
-        primeiro_acesso: true 
+        primeiro_acesso: false 
       });
 
       setIsSuccess(true);
@@ -49,7 +50,7 @@ const FirstAccess: React.FC<FirstAccessProps> = ({ user, onPasswordChanged }) =>
       setTimeout(() => {
         const updatedUser: User = { 
           ...user, 
-          primeiro_acesso: true, 
+          primeiro_acesso: false, 
           senha: newPassword 
         };
         onPasswordChanged(updatedUser);
@@ -134,6 +135,14 @@ const FirstAccess: React.FC<FirstAccessProps> = ({ user, onPasswordChanged }) =>
                 }`}
               >
                 {isSaving ? 'Gravando...' : 'Confirmar e Entrar'}
+              </button>
+
+              <button 
+                type="button"
+                onClick={onLogout}
+                className="w-full py-4 text-navy-400 font-black uppercase tracking-widest text-[9px] hover:text-navy-600 transition-colors"
+              >
+                Voltar ao Login
               </button>
             </>
           )}

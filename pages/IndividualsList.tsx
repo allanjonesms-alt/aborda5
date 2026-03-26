@@ -14,13 +14,10 @@ interface IndividualsListProps {
 const ITEMS_PER_PAGE = 12;
 
 const IndividualSkeleton = () => (
-  <div className="bg-white border border-navy-100 rounded-3xl h-[110px] sm:h-[400px] animate-pulse overflow-hidden flex flex-row sm:flex-col">
-    <div className="w-28 sm:w-full h-full sm:h-[230px] bg-gray-100"></div>
-    <div className="flex-1 p-4 sm:p-5 space-y-3">
-      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-      <div className="h-2 bg-gray-100 rounded w-1/2"></div>
-      <div className="hidden sm:block h-10 bg-gray-200 rounded-xl mt-4"></div>
-    </div>
+  <div className="bg-white border border-navy-100 rounded-3xl h-[110px] sm:h-[180px] animate-pulse overflow-hidden flex flex-col p-4 sm:p-5 space-y-3">
+    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+    <div className="h-2 bg-gray-100 rounded w-1/2"></div>
+    <div className="hidden sm:block h-10 bg-gray-200 rounded-xl mt-4"></div>
   </div>
 );
 
@@ -34,25 +31,9 @@ const IndividualCard = memo(({ ind, onEdit, onManagePhotos }: {
   return (
     <div 
       onClick={() => onEdit(ind)} 
-      className="bg-white border border-navy-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg hover:border-forest-600/50 cursor-pointer flex flex-row sm:flex-col group transition-all h-[110px] sm:h-[420px] hover:shadow-forest-600/10 active:scale-[0.98]"
+      className="bg-white border border-navy-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg hover:border-forest-600/50 cursor-pointer group transition-all h-[110px] sm:h-[180px] hover:shadow-forest-600/10 active:scale-[0.98]"
     >
-      <div className="w-28 sm:w-full h-full sm:h-[230px] bg-gray-50 relative flex-shrink-0 overflow-hidden">
-        {primaryPhoto ? (
-          <img 
-            src={primaryPhoto} 
-            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" 
-            alt={ind.nome} 
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center opacity-20">
-            <i className="fas fa-user-secret text-4xl sm:text-7xl mb-0 sm:mb-4 text-navy-300"></i>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950/20 via-transparent to-transparent opacity-60"></div>
-      </div>
-
-      <div className="flex-1 p-3 sm:p-5 flex flex-col justify-between bg-white border-l sm:border-l-0 sm:border-t border-navy-100 min-w-0">
+      <div className="flex-1 p-3 sm:p-5 flex flex-col justify-between bg-white min-w-0 h-full">
         <div className="space-y-2 sm:space-y-3 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
             <h3 className="text-[10px] sm:text-xs font-black text-navy-950 uppercase truncate max-w-[85%] sm:max-w-[70%] leading-none group-hover:text-forest-500 transition-colors">
@@ -140,26 +121,29 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       const individualsRef = collection(db, 'individuals');
       let q;
 
+      // Filtro de unidade
+      const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+
       if (isInitial) {
-        const countSnapshot = await getCountFromServer(individualsRef);
+        const countSnapshot = unitFilter 
+          ? await getCountFromServer(query(individualsRef, unitFilter))
+          : await getCountFromServer(individualsRef);
         setTotalCount(countSnapshot.data().count);
       }
 
       if (searchTerm.trim()) {
         const s = searchTerm.trim();
-        q = query(
-          individualsRef,
-          where('nome', '>=', s),
-          where('nome', '<=', s + '\uf8ff'),
-          orderBy('nome'),
-          limit(ITEMS_PER_PAGE)
-        );
+        const baseQuery = unitFilter 
+          ? query(individualsRef, unitFilter, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'))
+          : query(individualsRef, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'));
+        
+        q = query(baseQuery, limit(ITEMS_PER_PAGE));
       } else {
-        q = query(
-          individualsRef,
-          orderBy('nome'),
-          limit(ITEMS_PER_PAGE)
-        );
+        const baseQuery = unitFilter 
+          ? query(individualsRef, unitFilter, orderBy('nome'))
+          : query(individualsRef, orderBy('nome'));
+          
+        q = query(baseQuery, limit(ITEMS_PER_PAGE));
       }
 
       if (!isInitial && lastDoc) {
@@ -175,7 +159,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         
         // Fetch photos for this individual
         const photosRef = collection(db, 'individual_photos');
-        const photosQ = query(photosRef, where('individuo_id', '==', docSnapshot.id));
+        const photosQ = query(photosRef, where('individuo_id', '==', docSnapshot.id), orderBy('__name__'));
         const photosSnapshot = await getDocs(photosQ);
         
         const photos = photosSnapshot.docs.map(pDoc => ({ id: pDoc.id, ...pDoc.data() } as PhotoRecord));

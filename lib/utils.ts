@@ -29,3 +29,25 @@ export const validateCPF = (cpf: string) => {
 
   return true;
 };
+
+export const allowedCities = [
+  'COXIM',
+  'RIO VERDE DE MATO GROSSO',
+  'RIO VERDE DE MT',
+  'SONORA',
+  'ALCINÓPOLIS',
+  'PEDRO GOMES',
+  'SÃO GABRIEL DO OESTE'
+];
+
+export const checkCity = (addressComponents: any[]) => {
+  const cityComponent = addressComponents.find(c => 
+    c.types.includes('locality') || 
+    c.types.includes('administrative_area_level_2')
+  );
+  
+  if (!cityComponent) return false;
+  
+  const cityName = cityComponent.long_name.toUpperCase();
+  return allowedCities.some(city => cityName.includes(city));
+};

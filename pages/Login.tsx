@@ -18,6 +18,32 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isUsersEmpty, setIsUsersEmpty] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
 
+  // Helper to normalize user data from Firestore
+  const normalizeUser = (id: string, data: any): User => {
+    const rawVal = data.primeiro_acesso;
+    const normalizedPrimeiroAcesso = (
+      rawVal === true || 
+      rawVal === 'true' || 
+      rawVal === 'TRUE' || 
+      rawVal === 't' || 
+      rawVal === 'T' || 
+      rawVal === 1 ||
+      rawVal === '1'
+    );
+
+    const rawRole = String(data.role || '').toUpperCase();
+    const role = rawRole === 'ADMIN' ? UserRole.ADMIN : UserRole.OPERATOR;
+
+    return {
+      id: id,
+      matricula: data.matricula || 'N/A',
+      nome: data.nome || 'Operador',
+      senha: data.senha || '',
+      role: role,
+      primeiro_acesso: normalizedPrimeiroAcesso
+    };
+  };
+
   // Verificar se existem usuários no sistema
   React.useEffect(() => {
     const checkUsers = async () => {
@@ -86,31 +112,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       } else {
         const data = querySnapshot.docs[0].data();
         const id = querySnapshot.docs[0].id;
-
-        const rawVal = data.primeiro_acesso;
-        const normalizedPrimeiroAcesso = (
-          rawVal === true || 
-          rawVal === 'true' || 
-          rawVal === 'TRUE' || 
-          rawVal === 't' || 
-          rawVal === 'T' || 
-          rawVal === 1 ||
-          rawVal === '1'
-        );
-
-        const rawRole = String(data.role || '').toUpperCase();
-        const role = rawRole === 'ADMIN' ? UserRole.ADMIN : UserRole.OPERATOR;
-
-        const loggedUser: User = {
-          id: id,
-          matricula: data.matricula,
-          nome: data.nome || 'Operador',
-          senha: data.senha,
-          role: role,
-          primeiro_acesso: normalizedPrimeiroAcesso
-        };
-        
-        onLogin(loggedUser);
+        onLogin(normalizeUser(id, data));
       }
     } catch (err: any) {
       console.error('Erro de Autenticação:', err);

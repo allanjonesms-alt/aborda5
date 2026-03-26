@@ -89,11 +89,11 @@ service cloud.firestore {
     }
 
     function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
+      return request.resource != null && request.resource.data != null && request.resource.data.keys().hasAll(fields);
     }
 
     function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+      return request.resource != null && request.resource.data != null && request.resource.data.keys().hasOnly(fields);
     }
 
     // ===============================================================
@@ -113,8 +113,9 @@ service cloud.firestore {
     }
 
     function isValidIndividual(data) {
-      return hasOnlyAllowedFields(['nome', 'alcunha', 'documento', 'data_nascimento', 'mae', 'endereco', 'faccao', 'observacao', 'created_at', 'updated_at']) &&
-             data.nome is string && data.nome.size() > 0 && data.nome.size() < 200;
+      return hasOnlyAllowedFields(['nome', 'alcunha', 'documento', 'data_nascimento', 'mae', 'endereco', 'faccao', 'observacao', 'unidade', 'created_at', 'updated_at']) &&
+             data.nome is string && data.nome.size() > 0 && data.nome.size() < 200 &&
+             (!('unidade' in data) || data.unidade is string);
     }
 
     function isValidPhoto(data) {
@@ -141,7 +142,7 @@ service cloud.firestore {
     }
 
     match /individuals/{individualId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
       allow create: if isAuthenticated() && isValidIndividual(request.resource.data);
       allow update: if isAuthenticated() && isValidIndividual(request.resource.data);
       allow delete: if isAdmin();

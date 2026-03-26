@@ -6,7 +6,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, writeBatch, addDoc } from 'firebase/firestore';
 import LocationPickerModal from '../components/LocationPickerModal';
 import TacticalAlert from '../components/TacticalAlert';
-import { maskCPF, validateCPF } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
 import { Shift, User, UserRole, Individual } from '../types';
 import { loadGoogleMaps } from '../lib/googleMaps';
 
@@ -172,8 +172,17 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
 
     try {
       const google = (window as any).google;
+      const bounds = {
+        north: -17.4,
+        south: -19.5,
+        east: -53.5,
+        west: -55.0,
+      };
+
       const options = {
         componentRestrictions: { country: "br" },
+        bounds: bounds,
+        strictBounds: true,
         fields: ['formatted_address', 'address_components', 'geometry'],
         types: ['address']
       };
@@ -186,6 +195,14 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
       autocompleteInstance.current.addListener('place_changed', () => {
         const place = autocompleteInstance.current.getPlace();
         if (!place.formatted_address) return;
+
+        if (!checkCity(place.address_components || [])) {
+          alert(`LOCAL FORA DE ÁREA!\n\nAs buscas estão restritas às cidades permitidas:\n${allowedCities.join(', ')}`);
+          if (residentialAddressRef.current) residentialAddressRef.current.value = '';
+          setIndividualData(prev => ({ ...prev, endereco_residencial: '' }));
+          return;
+        }
+
         setIndividualData(prev => ({ ...prev, endereco_residencial: place.formatted_address }));
       });
     } catch (err) {
