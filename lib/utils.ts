@@ -32,13 +32,14 @@ export const validateCPF = (cpf: string) => {
 
 export const allowedCities = [
   'COXIM',
-  'RIO VERDE DE MATO GROSSO',
-  'RIO VERDE DE MT',
   'SONORA',
   'ALCINÓPOLIS',
   'PEDRO GOMES',
-  'SÃO GABRIEL DO OESTE'
+  'SÃO GABRIEL DO OESTE',
+  '2ª CIA/RIO VERDE'
 ];
+
+export const RIO_VERDE_VARIATIONS = ['RIO VERDE', 'RIO VERDE DE MATO GROSSO', 'RIO VERDE DE MT'];
 
 export const checkCity = (addressComponents: any[]) => {
   const cityComponent = addressComponents.find(c => 
@@ -49,5 +50,9 @@ export const checkCity = (addressComponents: any[]) => {
   if (!cityComponent) return false;
   
   const cityName = cityComponent.long_name.toUpperCase();
+  
+  // Check if it matches any of the Rio Verde variations
+  if (RIO_VERDE_VARIATIONS.some(v => cityName.includes(v))) return true;
+  
   return allowedCities.some(city => cityName.includes(city));
 };

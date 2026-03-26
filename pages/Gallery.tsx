@@ -2,8 +2,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
-import { Individual } from '../types';
+import { Individual, User, UserRole } from '../types';
 import EditIndividualModal from '../components/EditIndividualModal';
+import { allowedCities, RIO_VERDE_VARIATIONS } from '../lib/utils';
 
 const ITEMS_PER_PAGE = 18;
 
@@ -15,17 +16,40 @@ interface IndividualWithPhoto extends Partial<Individual> {
   }[];
 }
 
-const CITIES = ['COXIM', 'SONORA', 'PEDRO GOMES', 'ALCINÓPOLIS', 'RIO VERDE'];
-
 const GallerySkeleton = () => (
   <div className="aspect-[3/4] bg-gray-50 border border-navy-100 rounded-3xl animate-pulse"></div>
 );
 
-const Gallery: React.FC = () => {
+interface GalleryProps {
+  user: User | null;
+}
+
+const Gallery: React.FC<GalleryProps> = ({ user }) => {
   const [data, setData] = useState<IndividualWithPhoto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('TODOS');
+  
+  const userCity = user?.unidade?.toUpperCase().replace(/[\s/]+/g, '') || '';
+  
+  // Find the matching city from allowedCities by normalizing both
+  const matchedCity = allowedCities.find(city => {
+    const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
+    const isMatch = normalizedCity.includes(userCity) || (userCity.includes('RIOVERDE') && normalizedCity === '2ªCIARIOVERDE');
+    return isMatch;
+  });
+
+  console.log('Gallery Debug:', { userUnidade: user?.unidade, userCity, matchedCity });
+  
+  const isAdmin = user?.role === UserRole.ADMIN;
+  const [activeFilter, setActiveFilter] = useState(isAdmin ? (matchedCity || 'TODOS') : (matchedCity || 'TODOS'));
+  
+  // Force filter for non-admins
+  useEffect(() => {
+    if (!isAdmin && matchedCity) {
+      setActiveFilter(matchedCity);
+    }
+  }, [isAdmin, matchedCity]);
+  
   const [selectedIndividual, setSelectedIndividual] = useState<Individual | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] = useState<any>(null);
@@ -92,7 +116,9 @@ const Gallery: React.FC = () => {
       
       if (activeFilter !== 'TODOS') {
         if (activeFilter === 'OUTROS') {
-          filtered = filtered.filter(item => !CITIES.some(city => item.endereco?.toUpperCase().includes(city)));
+          filtered = filtered.filter(item => !allowedCities.some(city => item.endereco?.toUpperCase().includes(city)));
+        } else if (activeFilter === '2ª CIA/RIO VERDE') {
+          filtered = filtered.filter(item => RIO_VERDE_VARIATIONS.some(v => item.endereco?.toUpperCase().includes(v)));
         } else {
           filtered = filtered.filter(item => item.endereco?.toUpperCase().includes(activeFilter));
         }
@@ -133,6 +159,13 @@ const Gallery: React.FC = () => {
     }
   };
 
+  const getAvailableFilters = () => {
+    if (!isAdmin && matchedCity) {
+      return [matchedCity];
+    }
+    return ['TODOS', ...allowedCities, 'OUTROS'];
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
@@ -147,7 +180,7 @@ const Gallery: React.FC = () => {
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {['TODOS', ...CITIES, 'OUTROS'].map(city => (
+          {getAvailableFilters().map(city => (
             <button 
               key={city} 
               onClick={() => setActiveFilter(city)} 

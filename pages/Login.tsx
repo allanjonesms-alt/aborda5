@@ -40,7 +40,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       nome: data.nome || 'Operador',
       senha: data.senha || '',
       role: role,
-      primeiro_acesso: normalizedPrimeiroAcesso
+      primeiro_acesso: normalizedPrimeiroAcesso,
+      unidade: data.unidade || ''
     };
   };
 

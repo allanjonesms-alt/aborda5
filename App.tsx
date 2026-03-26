@@ -157,7 +157,7 @@ const App: React.FC = () => {
             <Route path="/nova-abordagem" element={<NewApproach user={auth.user} />} />
             <Route path="/abordagens" element={<ApproachesList />} />
             <Route path="/individuos" element={<IndividualsList user={auth.user} />} />
-            <Route path="/galeria" element={<Gallery />} />
+            <Route path="/galeria" element={<Gallery user={auth.user} />} />
             <Route path="/mapas" element={<MapPage />} />
             <Route path="/configuracoes" element={<Settings user={auth.user} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
