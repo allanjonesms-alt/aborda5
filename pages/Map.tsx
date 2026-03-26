@@ -247,7 +247,7 @@ const MapPage: React.FC = () => {
             <i className="fas fa-chevron-left"></i>
           </button>
           <div>
-            <h2 className="text-navy-950 font-black uppercase tracking-tighter text-xl leading-none">Mapa Tático</h2>
+            <h2 className="text-navy-950 font-black uppercase tracking-tighter text-xl leading-none">Mapa</h2>
             <div className="flex gap-3 mt-1">
               <span className="text-[8px] font-black text-navy-600 uppercase tracking-widest flex items-center">
                 <i className="fas fa-circle mr-1 text-[6px]"></i> {markersCount.abordagens} Abordagens
@@ -277,7 +277,7 @@ const MapPage: React.FC = () => {
               ></div>
             </div>
             <p className="text-navy-400 text-[10px] mt-4 uppercase font-bold">
-              Processando {progress.current} de {progress.total} registros táticos
+              Processando {progress.current} de {progress.total} registros
             </p>
           </div>
         )}
