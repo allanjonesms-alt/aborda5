@@ -263,18 +263,18 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
                     key={op.id}
                     disabled={isAssigned}
                     onClick={() => activeRole && handleDropAssignment(activeRole, op.nome.toUpperCase())}
-                    className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all
+                    className={`flex items-center justify-between px-6 py-4 rounded-xl border transition-all w-full
                       ${isAssigned ? 'bg-navy-50 border-navy-100 text-navy-300' : 'bg-white border-navy-200 text-navy-950 active:bg-navy-50 active:border-navy-300'}
                     `}
                   >
                     <div className="flex flex-col items-start">
-                      <span className="text-[10px] font-black uppercase">{op.nome}</span>
-                      <span className="text-[8px] text-navy-400 font-bold uppercase">ID: {op.matricula}</span>
+                      <span className="text-xs font-black uppercase">{op.nome}</span>
+                      <span className="text-[10px] text-navy-400 font-bold uppercase">ID: {op.matricula}</span>
                     </div>
                     {isAssigned ? (
-                      <i className="fas fa-check text-navy-900 text-xs"></i>
+                      <i className="fas fa-check text-navy-900 text-sm"></i>
                     ) : (
-                      <i className="fas fa-plus text-navy-200 text-xs"></i>
+                      <i className="fas fa-plus text-navy-200 text-sm"></i>
                     )}
                   </button>
                 );
