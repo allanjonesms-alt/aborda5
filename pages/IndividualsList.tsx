@@ -89,6 +89,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   const [editingIndividual, setEditingIndividual] = useState<Individual | null>(null);
   const [managingPhotosIndividual, setManagingPhotosIndividual] = useState<Individual | null>(null);
   const [isAddingIndividual, setIsAddingIndividual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
