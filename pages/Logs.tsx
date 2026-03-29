@@ -15,6 +15,7 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
@@ -22,12 +23,27 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
     try {
       let q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(100));
       
+      const filters = [];
       if (actionFilter) {
-        q = query(collection(db, 'logs'), where('action', '==', actionFilter), orderBy('timestamp', 'desc'), limit(100));
+        filters.push(where('action', '==', actionFilter));
       }
+      
+      // Note: Firestore doesn't support complex date range filtering easily without composite indexes.
+      // For now, we will filter in-memory if dateFilter is set, or add a simple range query if possible.
+      // Given the current structure, let's stick to in-memory filtering for simplicity and reliability.
+      
+      q = query(collection(db, 'logs'), ...filters, orderBy('timestamp', 'desc'), limit(100));
 
       const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry));
+      let data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry));
+      
+      if (dateFilter) {
+        data = data.filter(log => {
+          const logDate = log.timestamp?.toDate?.()?.toISOString().split('T')[0];
+          return logDate === dateFilter;
+        });
+      }
+
       setLogs(data);
     } catch (err: any) {
       console.error('Erro ao buscar logs:', err);
@@ -130,6 +146,12 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
             <option value="USER_LOGIN">Login</option>
             <option value="USER_LOGOUT">Logout</option>
           </select>
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="bg-white border border-navy-100 text-navy-950 px-4 py-3 rounded-xl text-xs font-bold focus:ring-2 focus:ring-navy-500 outline-none shadow-sm"
+          />
           <button 
             onClick={fetchLogs}
             className="bg-navy-600 hover:bg-navy-500 text-white p-3 rounded-xl transition-all active:scale-95 shadow-lg"

@@ -4,15 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
 import { DBApproach, Individual } from '../types';
+import { formatAddress } from '../lib/utils';
 
 const ITEMS_PER_PAGE = 10;
 
 const ApproachSkeleton = () => (
-  <div className="bg-white border border-navy-100 rounded-2xl h-32 animate-pulse flex overflow-hidden">
-    <div className="w-32 bg-gray-100"></div>
-    <div className="flex-1 p-5 space-y-3">
-      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-      <div className="h-2 bg-gray-100 rounded w-1/2"></div>
+  <div className="bg-white border border-navy-100 rounded-xl h-24 animate-pulse flex overflow-hidden w-full">
+    <div className="w-20 bg-gray-100"></div>
+    <div className="flex-1 p-2 space-y-1">
+      <div className="h-2.5 bg-gray-200 rounded w-3/4"></div>
+      <div className="h-1.5 bg-gray-100 rounded w-1/2"></div>
     </div>
   </div>
 );
@@ -25,37 +26,43 @@ const ApproachCard = memo(({ app, onClick }: { app: any; onClick: () => void }) 
   return (
     <div 
       onClick={onClick}
-      className="bg-white border border-navy-100 rounded-2xl overflow-hidden shadow-lg hover:border-navy-600/50 hover:bg-gray-50 transition-all group flex h-32 cursor-pointer active:scale-[0.99]"
+      className="bg-white border border-navy-100 rounded-xl overflow-hidden shadow-sm hover:border-navy-600/50 hover:bg-gray-50 transition-all group flex h-24 cursor-pointer active:scale-[0.99] w-full"
     >
-      <div className="w-32 h-full flex-shrink-0 bg-gray-50 border-r border-navy-100 overflow-hidden">
+      <div className="w-20 h-full flex-shrink-0 bg-gray-50 border-r border-navy-100 overflow-hidden">
         {primaryPhoto ? (
           <img src={primaryPhoto} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-90 group-hover:opacity-100" loading="lazy" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center opacity-20"><i className="fas fa-user-secret text-3xl text-navy-300"></i></div>
+          <div className="w-full h-full flex items-center justify-center opacity-20"><i className="fas fa-user-secret text-xl text-navy-300"></i></div>
         )}
       </div>
 
-      <div className="flex-1 p-5 flex flex-col justify-between">
-        <div className="flex justify-between items-start gap-4">
+      <div className="flex-1 p-2 flex flex-col justify-between">
+        <div className="flex justify-between items-start gap-2">
           <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-black text-navy-950 uppercase tracking-tight truncate">
+            <div className="flex items-center gap-1">
+              <h3 className="text-xs font-black text-navy-950 uppercase tracking-tight truncate">
                 {app.individuo_nome || 'INDIVÍDUO N/I'}
               </h3>
               {faccao && (
-                <span className="text-[7px] font-black px-1 py-0.5 bg-red-600/10 text-red-600 rounded border border-red-500/30">
+                <span className="text-[8px] font-black px-1 py-0 bg-red-600/10 text-red-600 rounded border border-red-500/30">
                   {faccao}
                 </span>
               )}
             </div>
-            <div className="flex items-center text-navy-500 text-[10px] font-bold uppercase mt-1">
+            <div className="flex items-center text-navy-500 text-[10px] uppercase mt-0.5">
               {new Date(app.data).toLocaleDateString('pt-BR')} - {app.horario}
             </div>
           </div>
-          <i className="fas fa-chevron-right text-navy-200 group-hover:text-forest-500 group-hover:translate-x-1 transition-all"></i>
+          <i className="fas fa-chevron-right text-navy-200 group-hover:text-forest-500 group-hover:translate-x-1 transition-all text-xs"></i>
         </div>
-        <div className="flex items-center text-navy-400 text-[9px] font-bold uppercase tracking-tighter truncate">
-          <i className="fas fa-map-marker-alt text-red-500 mr-2"></i> {app.local}
+        <div className="flex flex-col text-navy-400 text-[10px] uppercase tracking-tighter">
+          <div className="flex items-center">
+            <i className="fas fa-map-marker-alt text-red-500 mr-1 flex-shrink-0"></i> 
+            {formatAddress(app.local).street}
+          </div>
+          {formatAddress(app.local).city && (
+            <div className="pl-4">{formatAddress(app.local).city}</div>
+          )}
         </div>
       </div>
     </div>
@@ -281,7 +288,7 @@ const ApproachesList: React.FC<ApproachesListProps> = ({ user }) => {
   return (
     <div className="max-w-5xl mx-auto py-6 px-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <h2 className="text-2xl font-black text-navy-950 uppercase tracking-tighter">Histórico Operacional</h2>
+        <h2 className="text-2xl font-black text-navy-950 uppercase tracking-tighter">Relatório de Abordagens</h2>
         <input type="text" placeholder="Filtrar registros..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-white border border-navy-200 text-navy-950 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-navy-500 transition-all font-bold text-sm w-full md:w-80 shadow-sm" />
       </div>
 

@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, orderBy } from 'firebase/firestore';
 import { Individual, User, PhotoRecord, Relationship, Attachment, DBApproach } from '../types';
-import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity, formatAddress } from '../lib/utils';
 import { loadGoogleMaps } from '../lib/googleMaps';
 
 interface AttachmentViewerModalProps {
@@ -82,6 +82,8 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [cpfError, setCpfError] = useState(false);
   
+  const [isEditing, setIsEditing] = useState(false);
+  
   const photos = individual.fotos_individuos || [];
   const initialIndex = photos.findIndex(p => p.is_primary);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(initialIndex !== -1 ? initialIndex : 0);
@@ -91,7 +93,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   const autocompleteInstance = useRef<any>(null);
 
   const initAutocomplete = () => {
-    if (!addressInputRef.current || !(window as any).google || !(window as any).google.maps || !(window as any).google.maps.places) return;
+    if (!isEditing || !addressInputRef.current || !(window as any).google || !(window as any).google.maps || !(window as any).google.maps.places) return;
 
     try {
       const google = (window as any).google;
@@ -134,6 +136,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   };
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden';
     fetchRelationships();
     fetchAttachments();
     fetchApproachesHistory();
@@ -141,15 +144,18 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
     const setup = async () => {
       try {
         await loadGoogleMaps();
-        initAutocomplete();
+        if (isEditing) initAutocomplete();
       } catch (err) {
         console.error("Erro ao carregar Google Maps no EditIndividualModal:", err);
       }
     };
 
     setup();
-    const timer = setTimeout(initAutocomplete, 1000);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => { if (isEditing) initAutocomplete(); }, 1000);
+    return () => {
+      document.body.style.overflow = 'unset';
+      clearTimeout(timer);
+    };
   }, [individual.id]);
 
   const fetchRelationships = async () => {
@@ -326,16 +332,23 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   return (
     <>
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md overflow-y-auto">
-        <div className="bg-white border border-navy-100 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto">
+        <div className="bg-white border border-navy-100 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto max-h-[90vh] flex flex-col">
           <div className="bg-navy-50 p-6 border-b border-navy-100 flex justify-between items-center sticky top-0 z-10">
             <div className="flex items-center space-x-3">
-              <div className="bg-navy-900 p-2 rounded-lg"><i className="fas fa-user-edit text-white"></i></div>
-              <h3 className="text-xl font-black text-navy-950 uppercase tracking-tighter">EDITAR INDIVIDUO</h3>
+              <div className="bg-navy-900 p-2 rounded-lg"><i className="fas fa-user text-white"></i></div>
+              <h3 className="text-xl font-black text-navy-950 uppercase tracking-tighter">PERFIL DO INDIVÍDUO</h3>
             </div>
-            <button onClick={onClose} className="text-navy-400 hover:text-navy-900 transition-colors"><i className="fas fa-times text-xl"></i></button>
+            <div className="flex items-center gap-3">
+              {!isEditing && (
+                <button onClick={() => setIsEditing(true)} className="text-navy-600 hover:text-navy-900 transition-colors font-black uppercase text-xs">
+                  <i className="fas fa-edit mr-2"></i> Editar
+                </button>
+              )}
+              <button onClick={onClose} className="text-navy-400 hover:text-navy-900 transition-colors"><i className="fas fa-times text-xl"></i></button>
+            </div>
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
             <div className="relative group bg-navy-50 rounded-xl border border-navy-100 overflow-hidden aspect-video flex items-center justify-center">
               {photos.length > 0 ? (
                 <>
@@ -366,20 +379,20 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Nome Completo</label>
-                      <input type="text" className="w-full bg-white border border-navy-200 rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold uppercase" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value.toUpperCase()})} />
+                      <input type="text" readOnly={!isEditing} className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold uppercase`} value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value.toUpperCase()})} />
                   </div>
                   
                   <div>
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Alcunha (Vulgo)</label>
-                      <input type="text" className="w-full bg-white border border-navy-200 rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold" value={formData.alcunha || ''} onChange={e => setFormData({...formData, alcunha: e.target.value})} />
+                      <input type="text" readOnly={!isEditing} className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold`} value={formData.alcunha || ''} onChange={e => setFormData({...formData, alcunha: e.target.value})} />
                   </div>
 
                   <div>
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Facção / Organização</label>
-                      <select className="w-full bg-white border border-navy-200 rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all appearance-none font-bold" value={formData.faccao || ''} onChange={e => setFormData({...formData, faccao: e.target.value})}>
+                      <select disabled={!isEditing} className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all appearance-none font-bold`} value={formData.faccao || ''} onChange={e => setFormData({...formData, faccao: e.target.value})}>
                         {FACCOES_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                   </div>
@@ -388,7 +401,8 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">CPF (Documento)</label>
                       <input 
                         type="text" 
-                        className={`w-full bg-white border ${cpfError ? 'border-red-500' : 'border-navy-200'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold`} 
+                        readOnly={!isEditing}
+                        className={`w-full bg-white border ${isEditing ? (cpfError ? 'border-red-500' : 'border-navy-200') : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold`} 
                         value={formData.documento || ''} 
                         onChange={handleCpfChange} 
                         maxLength={14}
@@ -397,32 +411,34 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
 
                   <div>
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Data de Nascimento</label>
-                      <input type="date" className="w-full bg-white border border-navy-200 rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold" value={formData.data_nascimento || ''} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} />
+                      <input type="date" readOnly={!isEditing} className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold`} value={formData.data_nascimento || ''} onChange={e => setFormData({...formData, data_nascimento: e.target.value})} />
                   </div>
 
-                  <div className="col-span-2">
+                  <div>
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Filiação Materna (Mãe)</label>
-                      <input type="text" className="w-full bg-white border border-navy-200 rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold uppercase" value={formData.mae || ''} onChange={e => setFormData({...formData, mae: e.target.value.toUpperCase()})} />
+                      <input type="text" readOnly={!isEditing} className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold uppercase`} value={formData.mae || ''} onChange={e => setFormData({...formData, mae: e.target.value.toUpperCase()})} />
                   </div>
 
-                  <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Endereço Residencial (Google Autocomplete)</label>
+                  <div>
+                      <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Endereço Residencial</label>
                       <div className="relative group">
                         <input 
                           type="text" 
                           ref={addressInputRef}
-                          className="w-full bg-white border border-navy-200 rounded-xl pl-10 pr-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold" 
+                          readOnly={!isEditing}
+                          className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl pl-10 pr-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold`} 
                           defaultValue={formData.endereco || ''} 
                           placeholder="Rua, Número, Bairro, Cidade" 
                         />
-                        <i className="fas fa-search-location absolute left-3 top-1/2 -translate-y-1/2 text-navy-300 group-focus-within:text-navy-900"></i>
+                        {isEditing && <i className="fas fa-search-location absolute left-3 top-1/2 -translate-y-1/2 text-navy-300 group-focus-within:text-navy-900"></i>}
                       </div>
                   </div>
 
-                  <div className="col-span-2">
+                  <div>
                       <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">Observações / Histórico Relevante</label>
                       <textarea 
-                        className="w-full bg-white border border-navy-200 rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold min-h-[100px] resize-none" 
+                        readOnly={!isEditing}
+                        className={`w-full bg-white border ${isEditing ? 'border-navy-200' : 'border-transparent'} rounded-xl px-4 py-2 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 transition-all font-bold min-h-[100px] resize-none`} 
                         value={formData.observacao || ''} 
                         onChange={e => setFormData({...formData, observacao: e.target.value})}
                         placeholder="Informações adicionais sobre o abordado..."
@@ -430,12 +446,23 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                   </div>
                 </div>
 
+                {isEditing && (
+                  <div className="flex gap-3 pt-4 border-t border-navy-100 sticky bottom-0 bg-white pb-2">
+                    <button type="button" onClick={() => { setIsEditing(false); setFormData({...individual}); }} className="flex-1 bg-navy-50 text-navy-900 font-black py-3 rounded-xl uppercase text-xs hover:bg-navy-100 transition-colors border border-navy-100">Cancelar</button>
+                    <button type="submit" disabled={isSaving} className="flex-1 bg-navy-900 text-white font-black py-3 rounded-xl uppercase text-xs hover:bg-navy-800 transition-colors shadow-lg shadow-navy-900/20">
+                        {isSaving ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>} Salvar Alterações
+                    </button>
+                  </div>
+                )}
+
                 <div className="space-y-4 pt-4 border-t border-navy-100">
                 <div className="flex items-center justify-between mb-2">
                     <h4 className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Documentos em Anexo</h4>
-                    <button type="button" onClick={() => attachmentInputRef.current?.click()} className="text-[9px] font-black uppercase text-navy-900 border border-navy-200 px-3 py-1.5 rounded-lg bg-navy-50 hover:bg-navy-100 transition-colors">
-                    <i className="fas fa-paperclip mr-2"></i> Anexar Doc
-                    </button>
+                    {isEditing && (
+                      <button type="button" onClick={() => attachmentInputRef.current?.click()} className="text-[9px] font-black uppercase text-navy-900 border border-navy-200 px-3 py-1.5 rounded-lg bg-navy-50 hover:bg-navy-100 transition-colors">
+                        <i className="fas fa-paperclip mr-2"></i> Anexar Doc
+                      </button>
+                    )}
                     <input type="file" ref={attachmentInputRef} onChange={handleAddAttachment} className="hidden" />
                 </div>
                 <div className="grid grid-cols-1 gap-2 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
@@ -450,8 +477,12 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                         </div>
                         <div className="flex gap-2 flex-shrink-0 ml-2">
                         <button type="button" onClick={() => setViewingAttachment(att)} className="text-navy-400 hover:text-navy-900 transition-all w-7 h-7 flex items-center justify-center rounded-full hover:bg-navy-100" title="Visualizar"><i className="fas fa-eye text-xs"></i></button>
-                        <button type="button" onClick={() => handleEditLegenda(att)} className="text-navy-400 hover:text-navy-900 transition-all w-7 h-7 flex items-center justify-center rounded-full hover:bg-navy-100" title="Editar Legenda"><i className="fas fa-pencil-alt text-xs"></i></button>
-                        <button type="button" onClick={() => removeAttachment(att.id)} className="text-navy-400 hover:text-red-500 transition-all w-7 h-7 flex items-center justify-center rounded-full hover:bg-navy-100" title="Excluir"><i className="fas fa-trash-alt text-xs"></i></button>
+                        {isEditing && (
+                          <>
+                            <button type="button" onClick={() => handleEditLegenda(att)} className="text-navy-400 hover:text-navy-900 transition-all w-7 h-7 flex items-center justify-center rounded-full hover:bg-navy-100" title="Editar Legenda"><i className="fas fa-pencil-alt text-xs"></i></button>
+                            <button type="button" onClick={() => removeAttachment(att.id)} className="text-navy-400 hover:text-red-500 transition-all w-7 h-7 flex items-center justify-center rounded-full hover:bg-navy-100" title="Excluir"><i className="fas fa-trash-alt text-xs"></i></button>
+                          </>
+                        )}
                         </div>
                     </div>
                     ))}
@@ -474,10 +505,16 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                             {new Date(app.data).toLocaleDateString('pt-BR')} às {app.horario}
                             </span>
                         </div>
+                        <span className="text-[9px] text-navy-500 font-bold uppercase truncate max-w-[100px]">
+                            {app.criado_por || 'N/A'}
+                        </span>
                         </div>
                         <div className="flex items-start gap-2">
                         <i className="fas fa-map-marker-alt text-red-500 text-[9px] mt-0.5"></i>
-                        <p className="text-[10px] text-navy-600 font-bold uppercase truncate leading-tight">{app.local}</p>
+                        <div className="flex flex-col">
+                          <p className="text-[10px] text-navy-600 font-bold uppercase truncate leading-tight">{formatAddress(app.local).street}</p>
+                          {formatAddress(app.local).city && <p className="text-[10px] text-navy-600 font-bold uppercase truncate leading-tight">{formatAddress(app.local).city}</p>}
+                        </div>
                         </div>
                     </div>
                     ))}

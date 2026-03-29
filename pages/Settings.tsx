@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Siren } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
@@ -11,6 +12,7 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ user }) => {
+  const navigate = useNavigate();
   const [usersList, setUsersList] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -113,7 +115,7 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
       <section className="px-4 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <button 
-              onClick={() => window.location.href = '/operadores'}
+              onClick={() => navigate('/operadores')}
               className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group hover:border-navy-600 transition-all text-left"
             >
               <div className="w-12 h-12 bg-navy-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-navy-600/50 transition-colors mb-4">
@@ -124,7 +126,7 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
             </button>
 
             <button 
-              onClick={() => window.location.href = '/logs'}
+              onClick={() => navigate('/logs')}
               className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group hover:border-navy-600 transition-all text-left"
             >
               <div className="w-12 h-12 bg-navy-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-navy-600/50 transition-colors mb-4">

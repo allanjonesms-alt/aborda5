@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthState, User } from './types';
 import { STORAGE_KEYS } from './constants';
 import Header from './components/Header';
+import ScrollToTop from './components/ScrollToTop';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewApproach from './pages/NewApproach';
@@ -175,6 +176,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
+      <ScrollToTop />
       <div className="flex flex-col min-h-screen bg-white">
         <Header user={auth.user} onLogout={handleLogout} />
         <main className="flex-1 container mx-auto p-4 md:p-6 pb-24">

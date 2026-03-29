@@ -56,3 +56,17 @@ export const checkCity = (addressComponents: any[]) => {
   
   return allowedCities.some(city => cityName.includes(city));
 };
+
+export const formatAddress = (address: string) => {
+  const parts = (address || '')
+    .replace(/BRASIL/gi, '')
+    .replace(/\d{5}-\d{3}/g, '')
+    .split(',')
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+  
+  const city = parts.length > 1 ? parts.pop() : '';
+  const street = parts.join(', ');
+  
+  return { street, city };
+};
