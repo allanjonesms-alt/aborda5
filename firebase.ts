@@ -1,13 +1,28 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+export async function logAction(userId: string, userName: string, action: string, details: string, metadata: any = {}) {
+  try {
+    await addDoc(collection(db, 'logs'), {
+      userId,
+      userName,
+      action,
+      details,
+      metadata,
+      timestamp: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error recording log:', error);
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',

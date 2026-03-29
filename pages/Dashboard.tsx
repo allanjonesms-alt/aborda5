@@ -72,12 +72,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const checkShift = async () => {
       try {
         const shiftsRef = collection(db, 'vtr_services');
-        const q = query(
+        const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+        
+        let q = query(
           shiftsRef,
           where('status', '==', 'ATIVO'),
           orderBy('horario_inicio', 'desc'),
           limit(1)
         );
+
+        if (unitFilter) {
+          q = query(
+            shiftsRef,
+            where('status', '==', 'ATIVO'),
+            unitFilter,
+            orderBy('horario_inicio', 'desc'),
+            limit(1)
+          );
+        }
         
         const querySnapshot = await getDocs(q);
         

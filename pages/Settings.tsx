@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Siren } from 'lucide-react';
 import { User, UserRole } from '../types';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, orderBy, getDocs, doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import AddUserModal from '../components/AddUserModal';
 
@@ -45,6 +45,15 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
         batch.set(indRef, { ...ind, created_at: serverTimestamp(), updated_at: serverTimestamp() });
       });
       await batch.commit();
+      
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'IMPORT_INDIVIDUALS',
+        `Importação de ${individualsToImport.length} indivíduos realizada.`,
+        { count: individualsToImport.length }
+      );
+
       console.log('Importação concluída com sucesso!');
       fetchUsers();
     } catch (err: any) {
@@ -97,6 +106,14 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
         primeiro_acesso: false 
       });
 
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'USER_PASSWORD_RESET',
+        `Senha do operador ${targetUser.nome} (MAT: ${targetUser.matricula}) resetada pelo administrador.`,
+        { targetUserId: targetUser.id }
+      );
+
       alert('Senha resetada com sucesso!');
       fetchUsers();
     } catch (err: any) {
@@ -119,6 +136,14 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
         ord: editingUser.ord,
         unidade: editingUser.unidade || ''
       });
+
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'USER_EDITED',
+        `Dados do operador ${editingUser.nome} (MAT: ${editingUser.matricula}) atualizados.`,
+        { targetUserId: editingUser.id }
+      );
 
       setEditingUser(null);
       fetchUsers();
@@ -165,6 +190,12 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               className="bg-navy-600 hover:bg-navy-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <i className="fas fa-user-plus"></i> Novo Operador
+            </button>
+            <button 
+              onClick={() => window.location.href = '/logs'}
+              className="bg-navy-900 hover:bg-navy-800 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <i className="fas fa-list-check"></i> Auditoria / Logs
             </button>
             <button 
               onClick={importIndividuals}
@@ -234,6 +265,7 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
         <AddUserModal 
           onClose={() => setIsAddingUser(false)} 
           onSave={() => { fetchUsers(); setIsAddingUser(false); }} 
+          currentUser={user}
         />
       )}
 

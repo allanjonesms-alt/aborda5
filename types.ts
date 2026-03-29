@@ -84,6 +84,8 @@ export interface DBApproach {
   resultado?: string;
   individuo_nome?: string;
   individuo_id?: string;
+  unidade?: string;
+  criado_por?: string;
   created_at?: string;
   foto_path?: string;
 }
@@ -91,4 +93,14 @@ export interface DBApproach {
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+}
+
+export interface LogEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  timestamp: any;
+  metadata?: any;
 }

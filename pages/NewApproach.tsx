@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Siren } from 'lucide-react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, writeBatch, addDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, writeBatch, addDoc, updateDoc } from 'firebase/firestore';
 import LocationPickerModal from '../components/LocationPickerModal';
 import TacticalAlert from '../components/TacticalAlert';
 import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
-import { Shift, User, UserRole, Individual } from '../types';
+import { Shift, User, UserRole, Individual, DBApproach } from '../types';
 import { loadGoogleMaps } from '../lib/googleMaps';
 
 interface PhotoRecordUI {
@@ -33,6 +33,7 @@ const FACCOES_OPTIONS = [
 
 const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
   console.log("NewApproach user:", user);
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const residentialAddressRef = useRef<HTMLInputElement>(null);
@@ -42,11 +43,15 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [checkingShift, setCheckingShift] = useState(true);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [loadingApproach, setLoadingApproach] = useState(!!id);
 
   const [approachData, setApproachData] = useState({
     data: '',
     horario: '',
-    local: ''
+    local: '',
+    relatorio: '',
+    objetos_apreendidos: '',
+    resultado: ''
   });
 
   const [individualData, setIndividualData] = useState({
@@ -71,6 +76,69 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
   const [cpfError, setCpfError] = useState(false);
   const [isManualDateTime, setIsManualDateTime] = useState(false);
   const [isEditingDateTime, setIsEditingDateTime] = useState(false);
+
+  // Fetch approach data if editing
+  useEffect(() => {
+    if (id) {
+      const fetchApproach = async () => {
+        try {
+          const docRef = doc(db, 'approaches', id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.id ? { id: docSnap.id, ...docSnap.data() } as DBApproach : null;
+            if (data) {
+              // Check permissions
+              const isAdmin = user?.role === UserRole.ADMIN;
+              const isCreator = data.criado_por === user?.id;
+
+              if (!isAdmin && !isCreator) {
+                setAlertMessage('ACESSO NEGADO: Você só pode editar registros criados por você.');
+                setTimeout(() => navigate('/abordagens'), 3000);
+                return;
+              }
+
+              setApproachData({
+                data: data.data,
+                horario: data.horario,
+                local: data.local,
+                relatorio: data.relatorio || '',
+                objetos_apreendidos: data.objetos_apreendidos || '',
+                resultado: data.resultado || ''
+              });
+              setIsManualDateTime(true);
+
+              if (data.individuo_id) {
+                setSelectedIndId(data.individuo_id);
+                const indRef = doc(db, 'individuals', data.individuo_id);
+                const indSnap = await getDoc(indRef);
+                if (indSnap.exists()) {
+                  const ind = indSnap.data();
+                  setIndividualData({
+                    nome: ind.nome,
+                    alcunha: ind.alcunha || '',
+                    documento: ind.documento || '',
+                    data_nascimento: ind.data_nascimento || '',
+                    mae: ind.mae || '',
+                    endereco_residencial: ind.endereco || '',
+                    faccao: ind.faccao || '',
+                    observacao: ind.observacao || ''
+                  });
+                  if (residentialAddressRef.current) {
+                    residentialAddressRef.current.value = ind.endereco || '';
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          handleFirestoreError(err, OperationType.GET, `approaches/${id}`);
+        } finally {
+          setLoadingApproach(false);
+        }
+      };
+      fetchApproach();
+    }
+  }, [id, user, navigate]);
 
   // Fecha sugestões ao clicar fora
   useEffect(() => {
@@ -305,6 +373,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           mae: individualData.mae.toUpperCase(),
           endereco: individualData.endereco_residencial,
           faccao: individualData.faccao,
+          unidade: user?.unidade || '',
           updated_at: new Date().toISOString()
         });
       } else {
@@ -330,24 +399,62 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           mae: individualData.mae.toUpperCase(),
           endereco: individualData.endereco_residencial,
           faccao: individualData.faccao,
+          unidade: user?.unidade || '',
           created_at: new Date().toISOString()
         });
       }
 
-      const appRef = doc(collection(db, 'approaches'));
-      batch.set(appRef, {
-        data: approachData.data,
-        horario: approachData.horario,
-        local: approachData.local,
-        individuo_id: indId,
-        individuo_nome: individualData.nome.toUpperCase(),
-        relatorio: `Abordagem registrada via Terminal SGAFT. Dados ${selectedIndId ? 'atualizados' : 'cadastrados'} no momento da ação.`,
-        created_at: new Date().toISOString()
-      });
+      if (id) {
+        const appRef = doc(db, 'approaches', id);
+        batch.update(appRef, {
+          data: approachData.data,
+          horario: approachData.horario,
+          local: approachData.local,
+          individuo_id: indId,
+          individuo_nome: individualData.nome.toUpperCase(),
+          relatorio: approachData.relatorio || `Abordagem editada via Terminal SGAFT.`,
+          resultado: approachData.resultado,
+          objetos_apreendidos: approachData.objetos_apreendidos,
+          updated_at: new Date().toISOString()
+        });
 
-      await batch.commit();
+        await batch.commit();
 
-      alert('Registro finalizado com sucesso!');
+        await logAction(
+          user?.id || '',
+          user?.nome || 'Sistema',
+          'APPROACH_EDITED',
+          `Abordagem editada para: ${individualData.nome.toUpperCase()}`,
+          { approachId: id, individualId: indId }
+        );
+      } else {
+        const appRef = doc(collection(db, 'approaches'));
+        batch.set(appRef, {
+          data: approachData.data,
+          horario: approachData.horario,
+          local: approachData.local,
+          individuo_id: indId,
+          individuo_nome: individualData.nome.toUpperCase(),
+          relatorio: approachData.relatorio || `Abordagem registrada via Terminal SGAFT. Dados ${selectedIndId ? 'atualizados' : 'cadastrados'} no momento da ação.`,
+          resultado: approachData.resultado,
+          objetos_apreendidos: approachData.objetos_apreendidos,
+          unidade: user?.unidade || '',
+          criado_por: user?.id || '',
+          created_at: new Date().toISOString()
+        });
+
+        await batch.commit();
+
+        await logAction(
+          user?.id || '',
+          user?.nome || 'Sistema',
+          'APPROACH_REGISTERED',
+          `Abordagem registrada para: ${individualData.nome.toUpperCase()}`,
+          { approachId: appRef.id, individualId: indId }
+        );
+      }
+
+      alert(id ? 'Registro atualizado com sucesso!' : 'Registro finalizado com sucesso!');
       navigate('/abordagens');
     } catch (err: any) {
       console.error(err);
@@ -376,7 +483,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
             <i className="fas fa-file-signature text-white text-2xl"></i>
           </div>
           <div>
-            <h2 className="text-2xl font-black text-navy-950 uppercase tracking-tighter leading-none">Nova Abordagem</h2>
+            <h2 className="text-2xl font-black text-navy-950 uppercase tracking-tighter leading-none">{id ? 'Editar Abordagem' : 'Nova Abordagem'}</h2>
             <p className="text-[10px] text-navy-500 font-black uppercase tracking-widest mt-2">
               {activeShift ? `CMD: ${activeShift.comandante}` : 'REGISTRO ADMIN'}
             </p>
@@ -462,7 +569,38 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
                 </button>
               </div>
             </div>
-            
+
+            <div>
+              <label className="block text-[10px] font-black text-navy-500 uppercase tracking-widest mb-2">Resultado / Status</label>
+              <input 
+                type="text" 
+                className="w-full bg-white border border-navy-200 text-navy-950 p-4 rounded-2xl outline-none font-bold text-sm uppercase focus:ring-2 focus:ring-navy-500 transition-all" 
+                placeholder="Ex: LIBERADO, APREENDIDO, PRESO"
+                value={approachData.resultado} 
+                onChange={e => setApproachData(prev => ({...prev, resultado: e.target.value.toUpperCase()}))} 
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-navy-500 uppercase tracking-widest mb-2">Objetos Apreendidos</label>
+              <input 
+                type="text" 
+                className="w-full bg-white border border-navy-200 text-navy-950 p-4 rounded-2xl outline-none font-bold text-sm uppercase focus:ring-2 focus:ring-navy-500 transition-all" 
+                placeholder="Ex: 1 CELULAR, 20G MACONHA"
+                value={approachData.objetos_apreendidos} 
+                onChange={e => setApproachData(prev => ({...prev, objetos_apreendidos: e.target.value.toUpperCase()}))} 
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-navy-500 uppercase tracking-widest mb-2">Relatório da Abordagem</label>
+              <textarea 
+                className="w-full bg-white border border-navy-200 text-navy-950 p-4 rounded-2xl outline-none font-bold text-sm min-h-[100px] resize-none focus:ring-2 focus:ring-navy-500 transition-all" 
+                placeholder="Descreva a dinâmica da abordagem..."
+                value={approachData.relatorio} 
+                onChange={e => setApproachData(prev => ({...prev, relatorio: e.target.value}))}
+              />
+            </div>
           </div>
         </div>
 
@@ -593,11 +731,46 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           </div>
         </div>
 
+        {/* SEÇÃO INSERIR FOTOS */}
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-navy-100 shadow-xl space-y-6">
+          <div className="border-b border-navy-50 pb-4">
+            <h3 className="text-xs font-black text-navy-950 uppercase tracking-widest flex items-center">
+              <i className="fas fa-camera text-forest-600 mr-2"></i> Inserir Fotos
+            </h3>
+          </div>
+          
+          <div className="flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-navy-200 rounded-2xl hover:border-forest-600 hover:bg-forest-50 transition-all text-navy-400 hover:text-forest-600"
+            >
+              <i className="fas fa-plus text-2xl mb-2"></i>
+              <span className="text-[10px] font-black uppercase">Adicionar</span>
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              accept="image/*"
+              capture="environment"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) {
+                  // Lógica para processar arquivos selecionados
+                  console.log("Arquivos selecionados:", e.target.files);
+                }
+              }}
+            />
+            {/* Aqui você pode mapear as fotos selecionadas para exibição */}
+          </div>
+        </div>
+
         <div className="bg-white p-6 md:p-8 rounded-3xl border border-navy-100 shadow-xl flex flex-col sm:flex-row gap-4">
           <button type="button" onClick={() => navigate(-1)} className="flex-1 bg-gray-100 text-navy-900 font-black py-4 rounded-2xl uppercase text-xs hover:bg-gray-200 transition-all">Sair</button>
           <button type="submit" disabled={isSaving} className="flex-[2] bg-forest-600 hover:bg-forest-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center uppercase text-sm active:scale-95">
             {isSaving ? <i className="fas fa-spinner fa-spin mr-3"></i> : <i className="fas fa-save mr-3"></i>} 
-            {isSaving ? 'Sincronizando...' : (selectedIndId ? 'Atualizar e Registrar' : 'Cadastrar e Registrar')}
+            {isSaving ? 'Sincronizando...' : (id ? 'Salvar Alterações' : (selectedIndId ? 'Atualizar e Registrar' : 'Cadastrar e Registrar'))}
           </button>
         </div>
       </form>

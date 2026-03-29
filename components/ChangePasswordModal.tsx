@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { User } from '../types';
 
@@ -60,6 +60,14 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ user, onClose
 
       // 2. Executa o update utilizando o ID como filtro único
       await updateDoc(userRef, { senha: newPassword });
+
+      await logAction(
+        user.id,
+        user.nome,
+        'USER_PASSWORD_CHANGED',
+        'O usuário alterou sua própria senha de acesso.',
+        {}
+      );
 
       setSuccess(true);
       setTimeout(() => onClose(), 2000);

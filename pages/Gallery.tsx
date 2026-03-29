@@ -75,11 +75,23 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
     }
 
     try {
+      const individualsRef = collection(db, 'individuals');
+      const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      
       let q = query(
-        collection(db, 'individuals'),
+        individualsRef,
         orderBy('nome', 'asc'),
         limit(ITEMS_PER_PAGE)
       );
+
+      if (unitFilter) {
+        q = query(
+          individualsRef,
+          unitFilter,
+          orderBy('nome', 'asc'),
+          limit(ITEMS_PER_PAGE)
+        );
+      }
 
       if (!isInitial && lastDoc) {
         q = query(q, startAfter(lastDoc));

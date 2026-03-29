@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole, Shift } from '../types';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import ChangePasswordModal from './ChangePasswordModal';
 import StartShiftModal from './StartShiftModal';
@@ -80,6 +80,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
       });
 
       await batch.commit();
+
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'SHIFT_ENDED',
+        `Encerramento de serviço: ${activeShift.comandante} (CMD) e ${activeShift.motorista} (MOT)`,
+        { shiftId: activeShift.id }
+      );
 
       console.log('Serviços encerrados');
       setActiveShift(null);

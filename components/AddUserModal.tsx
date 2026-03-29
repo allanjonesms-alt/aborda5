@@ -1,15 +1,16 @@
 
 import React, { useState } from 'react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, getDocs, writeBatch, doc, orderBy } from 'firebase/firestore';
-import { UserRole } from '../types';
+import { UserRole, User } from '../types';
 
 interface AddUserModalProps {
   onClose: () => void;
   onSave: () => void;
+  currentUser: User | null;
 }
 
-const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
+const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUser }) => {
   const [formData, setFormData] = useState({
     matricula: '',
     nome: '',
@@ -59,6 +60,15 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
       });
 
       await batch.commit();
+
+      // Log the action
+      await logAction(
+        currentUser?.id || '',
+        currentUser?.nome || 'Sistema',
+        'USER_CREATED',
+        `Novo operador cadastrado: ${formData.nome.toUpperCase()} (MAT: ${formData.matricula})`,
+        { newUserMatricula: formData.matricula }
+      );
 
       onSave();
       onClose();

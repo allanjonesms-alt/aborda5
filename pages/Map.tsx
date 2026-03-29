@@ -3,8 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Siren } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
-import { DBApproach, Individual } from '../types';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { DBApproach, Individual, User } from '../types';
 
 import { loadGoogleMaps } from '../lib/googleMaps';
 
@@ -17,7 +17,11 @@ interface MapMarker {
   details?: string;
 }
 
-const MapPage: React.FC = () => {
+interface MapPageProps {
+  user: User | null;
+}
+
+const MapPage: React.FC<MapPageProps> = ({ user }) => {
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,9 +35,14 @@ const MapPage: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+        
+        const approachesRef = collection(db, 'approaches');
+        const individualsRef = collection(db, 'individuals');
+
         const [approachesSnap, individualsSnap] = await Promise.all([
-          getDocs(collection(db, 'approaches')),
-          getDocs(collection(db, 'individuals'))
+          getDocs(unitFilter ? query(approachesRef, unitFilter) : approachesRef),
+          getDocs(unitFilter ? query(individualsRef, unitFilter) : individualsRef)
         ]);
 
         const approaches = approachesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as DBApproach)).filter(a => !!a.local);

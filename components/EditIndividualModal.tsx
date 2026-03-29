@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, orderBy } from 'firebase/firestore';
 import { Individual, User, PhotoRecord, Relationship, Attachment, DBApproach } from '../types';
 import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
@@ -299,6 +299,15 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
         data_nascimento: formData.data_nascimento || '', 
         updated_at: new Date().toISOString()
       });
+
+      await logAction(
+        currentUser?.id || '',
+        currentUser?.nome || 'Sistema',
+        'INDIVIDUAL_EDITED',
+        `Cadastro de indivíduo editado: ${formData.nome.toUpperCase()}`,
+        { individualId: individual.id }
+      );
+
       onSave(formData);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `individuals/${individual.id}`);

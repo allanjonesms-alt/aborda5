@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, addDoc, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
 import { User as AppUser, Individual } from '../types';
@@ -220,6 +220,15 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
       });
 
       await batch.commit();
+
+      await logAction(
+        currentUser?.id || '',
+        currentUser?.nome || 'Sistema',
+        'INDIVIDUAL_CREATED',
+        `Novo cadastro de indivíduo: ${formData.nome.toUpperCase()}`,
+        { individualId: indRef.id }
+      );
+
       onSave();
       onClose();
     } catch (err: any) {

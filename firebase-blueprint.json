@@ -252,6 +252,39 @@
         }
       },
       "required": ["comandante", "motorista", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System audit log entry",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User who performed the action"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Name of the user"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action performed"
+        },
+        "details": {
+          "type": "string",
+          "description": "Details of the action"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional metadata"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the action occurred"
+        }
+      },
+      "required": ["userId", "userName", "action", "details", "timestamp"]
     }
   },
   "firestore": {
@@ -278,6 +311,10 @@
     "/vtr_services/{serviceId}": {
       "schema": "VtrService",
       "description": "Patrol car services"
+    },
+    "/logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System audit logs"
     }
   }
 }

@@ -124,12 +124,12 @@ service cloud.firestore {
     }
 
     function isValidApproach(data) {
-      return hasOnlyAllowedFields(['data', 'horario', 'local', 'relatorio', 'objetos_apreendidos', 'resultado', 'individuo_nome', 'individuo_id', 'foto_path', 'created_at']) &&
+      return hasOnlyAllowedFields(['data', 'horario', 'local', 'relatorio', 'objetos_apreendidos', 'resultado', 'individuo_nome', 'individuo_id', 'foto_path', 'unidade', 'criado_por', 'created_at', 'updated_at']) &&
              data.data is string && data.horario is string && data.local is string;
     }
 
     function isValidVtrService(data) {
-      return hasOnlyAllowedFields(['comandante', 'motorista', 'patrulheiro_1', 'patrulheiro_2', 'horario_inicio', 'horario_fim', 'criado_por', 'encerrado_por_nome', 'status']) &&
+      return hasOnlyAllowedFields(['comandante', 'motorista', 'patrulheiro_1', 'patrulheiro_2', 'horario_inicio', 'horario_fim', 'criado_por', 'encerrado_por_nome', 'status', 'unidade']) &&
              data.comandante is string && data.motorista is string && data.status in ['ATIVO', 'ENCERRADO'];
     }
 
@@ -143,8 +143,8 @@ service cloud.firestore {
 
     match /individuals/{individualId} {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow create: if isAuthenticated() && isValidIndividual(request.resource.data);
-      allow update: if isAuthenticated() && isValidIndividual(request.resource.data);
+      allow create: if isAuthenticated() && isValidIndividual(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidIndividual(request.resource.data) && (isAdmin() || request.resource.data.unidade == resource.data.unidade);
       allow delete: if isAdmin();
     }
 
@@ -156,17 +156,22 @@ service cloud.firestore {
     }
 
     match /approaches/{approachId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidApproach(request.resource.data);
-      allow update: if isAuthenticated() && isValidApproach(request.resource.data);
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidApproach(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || (resource.data.criado_por == request.auth.uid && resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade)) && isValidApproach(request.resource.data) && (isAdmin() || request.resource.data.unidade == resource.data.unidade);
       allow delete: if isAdmin();
     }
 
     match /vtr_services/{serviceId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidVtrService(request.resource.data);
-      allow update: if isAuthenticated() && isValidVtrService(request.resource.data);
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidVtrService(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidVtrService(request.resource.data) && (isAdmin() || request.resource.data.unidade == resource.data.unidade);
       allow delete: if isAdmin();
+    }
+
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
     }
 
     // Default deny

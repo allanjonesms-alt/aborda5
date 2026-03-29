@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
 import { DBApproach, Individual } from '../types';
@@ -60,15 +61,16 @@ const ApproachCard = memo(({ app, onClick }: { app: any; onClick: () => void }) 
     </div>
   );
 });
-
 interface ApproachDetailModalProps {
   approach: DBApproach;
+  user: any;
   onClose: () => void;
 }
 
-const ApproachDetailModal: React.FC<ApproachDetailModalProps> = ({ approach, onClose }) => {
+const ApproachDetailModal: React.FC<ApproachDetailModalProps> = ({ approach, user, onClose }) => {
   const [individual, setIndividual] = useState<Individual | null>(null);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (approach.individuo_id) fetchIndividual(approach.individuo_id);
@@ -87,15 +89,34 @@ const ApproachDetailModal: React.FC<ApproachDetailModalProps> = ({ approach, onC
     } finally { setLoading(false); }
   };
 
+  const handleEdit = () => {
+    const isAdmin = user?.role === 'ADMIN';
+    const isCreator = approach.criado_por === user?.id;
+
+    if (isAdmin || isCreator) {
+      navigate(`/editar-abordagem/${approach.id}`);
+    } else {
+      alert('ACESSO NEGADO: Somente o operador que registrou esta abordagem pode editá-la.');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy-950/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white border border-navy-100 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-navy-600 p-6 border-b border-navy-500 flex justify-between items-center">
+        <div className="bg-navy-600 p-6 border-b border-navy-50 flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <div className="bg-forest-600 p-2 rounded-lg"><i className="fas fa-file-contract text-white"></i></div>
             <h3 className="text-sm font-black text-white uppercase tracking-tighter">Relatório Operacional</h3>
           </div>
-          <button onClick={onClose} className="text-navy-100 hover:text-white transition-colors"><i className="fas fa-times text-xl"></i></button>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handleEdit}
+              className="text-white bg-navy-500 hover:bg-navy-400 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2"
+            >
+              <i className="fas fa-edit"></i> Editar
+            </button>
+            <button onClick={onClose} className="text-navy-100 hover:text-white transition-colors"><i className="fas fa-times text-xl"></i></button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
@@ -156,7 +177,11 @@ const ApproachDetailModal: React.FC<ApproachDetailModalProps> = ({ approach, onC
   );
 };
 
-const ApproachesList: React.FC = () => {
+interface ApproachesListProps {
+  user: any;
+}
+
+const ApproachesList: React.FC<ApproachesListProps> = ({ user }) => {
   const [approaches, setApproaches] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -185,7 +210,13 @@ const ApproachesList: React.FC = () => {
 
     try {
       const approachesRef = collection(db, 'approaches');
+      const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      
       let q = query(approachesRef, orderBy('data', 'desc'), limit(ITEMS_PER_PAGE));
+
+      if (unitFilter) {
+        q = query(approachesRef, unitFilter, orderBy('data', 'desc'), limit(ITEMS_PER_PAGE));
+      }
 
       if (!isInitial && lastDoc) {
         q = query(q, startAfter(lastDoc));
@@ -276,7 +307,7 @@ const ApproachesList: React.FC = () => {
           {isLoadingMore && <div className="mt-4"><ApproachSkeleton /></div>}
         </div>
       )}
-      {selectedApproach && <ApproachDetailModal approach={selectedApproach} onClose={() => setSelectedApproach(null)} />}
+      {selectedApproach && <ApproachDetailModal approach={selectedApproach} user={user} onClose={() => setSelectedApproach(null)} />}
     </div>
   );
 };

@@ -110,6 +110,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   }, [isLoadingMore, isLoading, hasMore, debouncedSearch]);
 
   const fetchIndividuals = useCallback(async (isInitial: boolean = false, searchTerm: string = '') => {
+    console.log('Fetching individuals:', { isInitial, searchTerm, lastDoc });
     if (isInitial) {
       setIsLoading(true);
       setLastDoc(null);
@@ -132,7 +133,8 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       }
 
       if (searchTerm.trim()) {
-        const s = searchTerm.trim();
+        const s = searchTerm.trim().toUpperCase();
+        console.log('Search query for (normalized):', s);
         const baseQuery = unitFilter 
           ? query(individualsRef, unitFilter, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'))
           : query(individualsRef, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'));
@@ -151,11 +153,13 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       }
 
       const querySnapshot = await getDocs(q);
+      console.log('Query snapshot size:', querySnapshot.size);
       
       const newIndividuals: Individual[] = [];
       
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
+        console.log('Individual name:', data.nome);
         
         // Fetch photos for this individual
         const photosRef = collection(db, 'individual_photos');
@@ -180,7 +184,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [lastDoc]);
+  }, [lastDoc, user]);
 
   useEffect(() => {
     fetchIndividuals(true, debouncedSearch);

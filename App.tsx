@@ -11,9 +11,10 @@ import ApproachesList from './pages/ApproachesList';
 import IndividualsList from './pages/IndividualsList';
 import Gallery from './pages/Gallery';
 import Settings from './pages/Settings';
+import Logs from './pages/Logs';
 import FirstAccess from './pages/FirstAccess';
 import MapPage from './pages/Map';
-import { auth as firebaseAuth } from './firebase';
+import { auth as firebaseAuth, logAction } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
 interface ErrorBoundaryProps {
@@ -83,10 +84,6 @@ const App: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Force logout to show login screen as requested
-    localStorage.removeItem(STORAGE_KEYS.AUTH);
-    setAuth({ user: null, isAuthenticated: false });
-
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
       if (!user) {
         signInAnonymously(firebaseAuth).catch(console.error);
@@ -107,14 +104,33 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = (user: User) => {
+  const handleLogin = async (user: User) => {
     const newAuth = { user, isAuthenticated: true };
     setAuth(newAuth);
     localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(newAuth));
+    
+    await logAction(
+      user.id,
+      user.nome,
+      'USER_LOGIN',
+      `O usuário ${user.nome} realizou login no sistema.`,
+      {}
+    );
+
     navigate('/', { replace: true });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const user = auth.user;
+    if (user) {
+      await logAction(
+        user.id,
+        user.nome,
+        'USER_LOGOUT',
+        `O usuário ${user.nome} saiu do sistema.`,
+        {}
+      );
+    }
     setAuth({ user: null, isAuthenticated: false });
     localStorage.removeItem(STORAGE_KEYS.AUTH);
     navigate('/', { replace: true });
@@ -155,11 +171,13 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Dashboard user={auth.user} />} />
             <Route path="/nova-abordagem" element={<NewApproach user={auth.user} />} />
-            <Route path="/abordagens" element={<ApproachesList />} />
+            <Route path="/editar-abordagem/:id" element={<NewApproach user={auth.user} />} />
+            <Route path="/abordagens" element={<ApproachesList user={auth.user} />} />
             <Route path="/individuos" element={<IndividualsList user={auth.user} />} />
             <Route path="/galeria" element={<Gallery user={auth.user} />} />
-            <Route path="/mapas" element={<MapPage />} />
+            <Route path="/mapas" element={<MapPage user={auth.user} />} />
             <Route path="/configuracoes" element={<Settings user={auth.user} />} />
+            <Route path="/logs" element={<Logs user={auth.user} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

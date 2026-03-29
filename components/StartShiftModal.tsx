@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, getDocs, addDoc, orderBy } from 'firebase/firestore';
 import { User, Shift } from '../types';
 
@@ -55,20 +55,20 @@ const ViaturaDiagram = ({ assignments, onDrop, activeRole, onRoleSelect }: {
           ${isSelected ? 'ring-2 ring-yellow-500 border-yellow-500 bg-yellow-600/20 scale-105 z-20' : isOver ? 'bg-navy-100 border-navy-500 scale-105' : isOccupied ? 'bg-white border-navy-200 shadow-lg border-solid' : 'bg-navy-50 border-navy-100 border-dashed'}
           cursor-pointer
         `}
-        style={{ left: x, top: y, width: '100px', height: '64px' }}
+        style={{ left: x, top: y, width: '120px', height: '80px' }}
         onDragOver={(e) => handleDragOver(e, role)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, role)}
       >
-        <div className={`flex items-center gap-1.5 mb-0.5 ${isOccupied ? 'text-navy-900' : isSelected ? 'text-yellow-600' : 'text-navy-300'}`}>
-          <i className={`fas ${isOccupied ? 'fa-user-ninja' : isSelected ? 'fa-crosshairs' : 'fa-user-plus'} text-xs`}></i>
-          <span className="text-[7px] font-black uppercase tracking-tighter">{label}</span>
+        <div className={`flex items-center gap-1.5 mb-1 ${isOccupied ? 'text-navy-900' : isSelected ? 'text-yellow-600' : 'text-navy-300'}`}>
+          <i className={`fas ${isOccupied ? 'fa-user-ninja' : isSelected ? 'fa-crosshairs' : 'fa-user-plus'} text-sm`}></i>
+          <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
         </div>
         <div className="text-center w-full px-1">
           {isOccupied ? (
-            <span className="text-[9px] font-black text-navy-950 uppercase leading-none block truncate">{assignments[role]}</span>
+            <span className="text-[11px] font-black text-navy-950 uppercase leading-none block truncate">{assignments[role]}</span>
           ) : (
-            <span className="text-[7px] font-bold text-navy-200 uppercase italic leading-none">{isSelected ? 'Selecionar' : 'Vazio'}</span>
+            <span className="text-[8px] font-bold text-navy-200 uppercase italic leading-none">{isSelected ? 'Selecionar' : 'Vazio'}</span>
           )}
         </div>
       </div>
@@ -76,7 +76,7 @@ const ViaturaDiagram = ({ assignments, onDrop, activeRole, onRoleSelect }: {
   };
 
   return (
-    <div className="relative w-full sm:aspect-[2/3] max-w-[240px] mx-auto sm:scale-110 h-[220px] sm:h-auto bg-navy-950/20 rounded-3xl border border-navy-700/30 sm:border-none">
+    <div className="relative w-full sm:aspect-[2/3] max-w-[320px] mx-auto sm:scale-110 h-[260px] sm:h-auto bg-navy-950/20 rounded-3xl border border-navy-700/30 sm:border-none">
       {/* VTR VECTOR - TOP VIEW */}
       <svg viewBox="0 0 400 600" className="hidden sm:block w-full h-full text-navy-400 drop-shadow-[0_0_20px_rgba(0,0,0,0.5)]" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -184,8 +184,17 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
         patrulheiro_2: assignments.patrulheiro_2,
         criado_por: user?.id || '',
         status: 'ATIVO',
+        unidade: user?.unidade || '',
         horario_inicio: new Date().toISOString()
       });
+
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'SHIFT_STARTED',
+        `Início de serviço: VTR com CMD ${assignments.comandante} e MOT ${assignments.motorista}`,
+        { assignments }
+      );
 
       onStarted();
       onClose();
@@ -238,16 +247,16 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
                     key={op.id}
                     draggable={!isAssigned}
                     onDragStart={(e) => handleDragStart(e, op.nome.toUpperCase())}
-                    className={`p-0 rounded-xl border transition-all flex items-center gap-1.5 cursor-grab active:cursor-grabbing group min-w-0 h-9
+                    className={`p-0 rounded-xl border transition-all flex items-center gap-1.5 cursor-grab active:cursor-grabbing group min-w-0 h-12
                       ${isAssigned ? 'bg-navy-100 border-navy-200 opacity-30 cursor-not-allowed' : 'bg-white border-navy-100 hover:border-navy-300 hover:bg-navy-50 shadow-sm'}
                     `}
                   >
-                    <div className={`w-6 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl ${isAssigned ? 'bg-navy-200 text-navy-400' : 'bg-navy-900 text-white'}`}>
-                      <i className="fas fa-id-badge text-[9px]"></i>
+                    <div className={`w-8 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl ${isAssigned ? 'bg-navy-200 text-navy-400' : 'bg-navy-900 text-white'}`}>
+                      <i className="fas fa-id-badge text-xs"></i>
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
-                      <p className="text-[8px] font-black text-navy-950 uppercase truncate leading-none mb-0.5">{op.nome}</p>
-                      <p className="text-[6.5px] font-bold text-navy-400 uppercase tracking-tighter leading-none">ID: {op.matricula}</p>
+                      <p className="text-[10px] font-black text-navy-950 uppercase truncate leading-none mb-0.5">{op.nome}</p>
+                      <p className="text-[8px] font-bold text-navy-400 uppercase tracking-tighter leading-none">ID: {op.matricula}</p>
                     </div>
                   </div>
                 );
