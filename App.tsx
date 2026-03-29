@@ -123,19 +123,27 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    console.log('Iniciando logout...');
     const user = auth.user;
     if (user) {
-      await logAction(
-        user.id,
-        user.nome,
-        'USER_LOGOUT',
-        `O usuário ${user.nome} saiu do sistema.`,
-        {}
-      );
+      try {
+        await logAction(
+          user.id,
+          user.nome,
+          'USER_LOGOUT',
+          `O usuário ${user.nome} saiu do sistema.`,
+          {}
+        );
+        console.log('Log de logout gravado.');
+      } catch (err) {
+        console.error('Erro ao gravar log de logout:', err);
+      }
     }
     setAuth({ user: null, isAuthenticated: false });
     localStorage.removeItem(STORAGE_KEYS.AUTH);
+    console.log('Estado de auth resetado e localStorage limpo.');
     navigate('/', { replace: true });
+    console.log('Navegação para home concluída.');
   };
 
   const handlePasswordChanged = (updatedUser: User) => {

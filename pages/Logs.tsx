@@ -19,7 +19,6 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    console.log('Buscando logs...');
     try {
       let q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'), limit(100));
       
@@ -28,7 +27,6 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
       }
 
       const querySnapshot = await getDocs(q);
-      console.log('Logs encontrados:', querySnapshot.size);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LogEntry));
       setLogs(data);
     } catch (err: any) {
@@ -45,7 +43,6 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
   }, [actionFilter]);
 
   useEffect(() => {
-    console.log('Logs component user:', user);
     if (user?.role === UserRole.ADMIN) {
       fetchLogs();
     }

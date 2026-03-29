@@ -110,10 +110,17 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   }, [isLoadingMore, isLoading, hasMore, debouncedSearch]);
 
   const fetchIndividuals = useCallback(async (isInitial: boolean = false, searchTerm: string = '') => {
+    // Só busca se o usuário estiver carregado
+    if (!user) {
+      console.log('Aguardando carregamento do usuário...');
+      return;
+    }
+
     console.log('Fetching individuals:', { isInitial, searchTerm, lastDoc });
     if (isInitial) {
       setIsLoading(true);
       setLastDoc(null);
+      setError(null); // Reset error on new fetch
     } else {
       setIsLoadingMore(true);
     }
@@ -134,7 +141,6 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
 
       if (searchTerm.trim()) {
         const s = searchTerm.trim().toUpperCase();
-        console.log('Search query for (normalized):', s);
         const baseQuery = unitFilter 
           ? query(individualsRef, unitFilter, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'))
           : query(individualsRef, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'));
@@ -153,13 +159,11 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       }
 
       const querySnapshot = await getDocs(q);
-      console.log('Query snapshot size:', querySnapshot.size);
       
       const newIndividuals: Individual[] = [];
       
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
-        console.log('Individual name:', data.nome);
         
         // Fetch photos for this individual
         const photosRef = collection(db, 'individual_photos');
@@ -178,8 +182,13 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       setIndividuals(prev => isInitial ? newIndividuals : [...prev, ...newIndividuals]);
       setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
       setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching individuals:', err);
+      let errorMessage = 'Erro ao carregar indivíduos. Tente novamente.';
+      if (err.message?.includes('index')) {
+        errorMessage = 'O sistema está preparando os índices de busca. Aguarde alguns minutos.';
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -231,7 +240,18 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 px-4">
-        {isLoading && individuals.length === 0 ? (
+        {error ? (
+          <div className="col-span-full py-20 text-center bg-red-50 rounded-3xl border border-red-100">
+            <i className="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+            <p className="text-red-700 font-bold text-sm mb-4">{error}</p>
+            <button 
+              onClick={() => fetchIndividuals(true, debouncedSearch)}
+              className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-xl font-black text-xs uppercase transition-all"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        ) : isLoading && individuals.length === 0 ? (
           Array.from({ length: 12 }).map((_, i) => <IndividualSkeleton key={i} />)
         ) : (
           <>
