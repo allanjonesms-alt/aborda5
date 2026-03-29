@@ -11,6 +11,7 @@ import ApproachesList from './pages/ApproachesList';
 import IndividualsList from './pages/IndividualsList';
 import Gallery from './pages/Gallery';
 import Settings from './pages/Settings';
+import Operators from './pages/Operators';
 import Logs from './pages/Logs';
 import FirstAccess from './pages/FirstAccess';
 import MapPage from './pages/Map';
@@ -84,6 +85,7 @@ const App: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('App component auth:', auth);
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
       if (!user) {
         signInAnonymously(firebaseAuth).catch(console.error);
@@ -177,6 +179,7 @@ const App: React.FC = () => {
             <Route path="/galeria" element={<Gallery user={auth.user} />} />
             <Route path="/mapas" element={<MapPage user={auth.user} />} />
             <Route path="/configuracoes" element={<Settings user={auth.user} />} />
+            <Route path="/operadores" element={<Operators user={auth.user} />} />
             <Route path="/logs" element={<Logs user={auth.user} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
