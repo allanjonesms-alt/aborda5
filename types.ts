@@ -104,3 +104,22 @@ export interface LogEntry {
   timestamp: any;
   metadata?: any;
 }
+
+export interface OccurrenceSS {
+  id: string;
+  nr_ss: string;
+  tipo_ss: 'Rondas' | 'Policiamento em evento' | 'Policiamento Medidas Protetivas' | 'Atendimento de Chamada';
+  gu_servico: string[];
+  unidade?: string;
+  criado_por: string;
+  created_at: string;
+}
+
+export interface OccurrenceRO {
+  id: string;
+  nr_ro: string;
+  fato: string;
+  unidade?: string;
+  criado_por: string;
+  created_at: string;
+}

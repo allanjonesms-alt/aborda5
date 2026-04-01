@@ -48,9 +48,29 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
     } catch (err: any) {
       console.error('Erro ao buscar logs:', err);
       let message = 'Erro ao carregar auditoria.';
-      if (err.message?.includes('index')) {
-        message = 'O sistema está preparando os índices de busca. Por favor, aguarde alguns minutos e tente novamente.';
+      
+      if (err.message?.toLowerCase().includes('index') || err.code === 'failed-precondition') {
+        const indexLink = err.message?.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+        if (indexLink) {
+          message = (
+            <div className="flex flex-col items-center gap-2">
+              <span>Índice de busca necessário ausente.</span>
+              <a 
+                href={indexLink} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-navy-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase hover:bg-navy-500 transition-all"
+              >
+                Criar Índice no Firebase
+              </a>
+            </div>
+          ) as any;
+        } else {
+          message = 'O sistema está preparando os índices de busca ou um índice necessário está ausente. Por favor, aguarde alguns minutos ou contate o administrador.';
+        }
+        console.error('Firestore Index Error in Logs. Full message:', err.message);
       }
+      
       setError(message);
       // We don't throw here to avoid crashing the component, we show the error in UI
     } finally {

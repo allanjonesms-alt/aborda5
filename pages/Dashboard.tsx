@@ -181,6 +181,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           description="Registrar nova abordagem policial em campo."
           disabled={!canRegisterApproach && !!activeShift}
         />
+        {isAdmin && (
+          <MenuButton
+            to="/ocorrencias"
+            icon="fa-file-invoice"
+            label="Ocorrências"
+            colorClass="bg-red-700"
+            description="SS e RO Realizados."
+          />
+        )}
         <MenuButton
           to="/abordagens"
           icon="fa-history"
@@ -208,6 +217,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           label="Mapas"
           colorClass="bg-forest-700"
           description="Visualização geográfica de ocorrências e endereços."
+        />
+        <MenuButton
+          to="/manual"
+          icon="fa-book"
+          label="Manual do Usuário"
+          colorClass="bg-navy-800"
+          description="Guia completo de utilização do sistema para operadores."
         />
 
         {user?.role === UserRole.ADMIN && (

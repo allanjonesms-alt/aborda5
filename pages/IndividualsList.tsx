@@ -186,9 +186,30 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
     } catch (err: any) {
       console.error('Error fetching individuals:', err);
       let errorMessage = 'Erro ao carregar indivíduos. Tente novamente.';
-      if (err.message?.includes('index')) {
-        errorMessage = 'O sistema está preparando os índices de busca. Aguarde alguns minutos.';
+      
+      // Check if it's a Firestore index error
+      if (err.message?.toLowerCase().includes('index') || err.code === 'failed-precondition') {
+        const indexLink = err.message?.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+        if (indexLink) {
+          errorMessage = (
+            <div className="flex flex-col items-center gap-2">
+              <span>O sistema requer um índice de busca que ainda não foi criado.</span>
+              <a 
+                href={indexLink} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-navy-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase hover:bg-navy-500 transition-all"
+              >
+                Clique aqui para criar o índice
+              </a>
+            </div>
+          ) as any;
+        } else {
+          errorMessage = 'O sistema está preparando os índices de busca ou um índice necessário está ausente. Se você for o administrador, verifique o console do Firebase.';
+        }
+        console.error('Firestore Index Error. Full message:', err.message);
       }
+      
       setError(errorMessage);
     } finally {
       setIsLoading(false);

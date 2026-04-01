@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { AuthState, User } from './types';
+import { AuthState, User, UserRole } from './types';
 import { STORAGE_KEYS } from './constants';
 import Header from './components/Header';
 import ScrollToTop from './components/ScrollToTop';
@@ -16,6 +16,8 @@ import Operators from './pages/Operators';
 import Logs from './pages/Logs';
 import FirstAccess from './pages/FirstAccess';
 import MapPage from './pages/Map';
+import UserManual from './pages/UserManual';
+import Occurrences from './pages/Occurrences';
 import { auth as firebaseAuth, logAction } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
@@ -123,16 +125,17 @@ const App: React.FC = () => {
     navigate('/', { replace: true });
   };
 
-  const handleLogout = async () => {
-    console.log('Iniciando logout...');
+  const handleLogout = useCallback(async (isAuto: boolean | React.MouseEvent | React.PointerEvent = false) => {
+    const autoLogout = isAuto === true;
+    console.log(`Iniciando logout ${autoLogout ? 'automático' : 'manual'}...`);
     const user = auth.user;
     if (user) {
       try {
         await logAction(
           user.id,
           user.nome,
-          'USER_LOGOUT',
-          `O usuário ${user.nome} saiu do sistema.`,
+          autoLogout ? 'AUTO_LOGOUT' : 'USER_LOGOUT',
+          `O usuário ${user.nome} ${autoLogout ? 'foi desconectado automaticamente por inatividade' : 'saiu do sistema'}.`,
           {}
         );
         console.log('Log de logout gravado.');
@@ -145,7 +148,37 @@ const App: React.FC = () => {
     console.log('Estado de auth resetado e localStorage limpo.');
     navigate('/', { replace: true });
     console.log('Navegação para home concluída.');
-  };
+  }, [auth.user, navigate]);
+
+  // Inactivity Logout Logic
+  useEffect(() => {
+    if (!auth.isAuthenticated) return;
+
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogout(true);
+      }, INACTIVITY_TIMEOUT);
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [auth.isAuthenticated, handleLogout]);
 
   const handlePasswordChanged = (updatedUser: User) => {
     const newAuth = { user: updatedUser, isAuthenticated: true };
@@ -191,6 +224,8 @@ const App: React.FC = () => {
             <Route path="/configuracoes" element={<Settings user={auth.user} />} />
             <Route path="/operadores" element={<Operators user={auth.user} />} />
             <Route path="/logs" element={<Logs user={auth.user} />} />
+            <Route path="/manual" element={<UserManual />} />
+            <Route path="/ocorrencias" element={auth.user?.role === UserRole.ADMIN ? <Occurrences user={auth.user} /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

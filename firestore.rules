@@ -68,6 +68,25 @@ service cloud.firestore {
     //   - encerrado_por_nome: string (optional) - User name who ended the service
     //   - status: string (required, enum: ['ATIVO', 'ENCERRADO']) - Service status
     //
+    // Collection: occurrences_ss
+    // Document ID: occurrenceId
+    // Fields:
+    //   - nr_ss: string (required, 10 digits)
+    //   - tipo_ss: string (required, enum: ['Rondas', 'Policiamento em evento', 'Policiamento Medidas Protetivas', 'Atendimento de Chamada'])
+    //   - gu_servico: list (required, strings)
+    //   - unidade: string (optional)
+    //   - criado_por: string (required)
+    //   - created_at: string (required, format: date-time)
+    //
+    // Collection: occurrences_ro
+    // Document ID: occurrenceId
+    // Fields:
+    //   - nr_ro: string (required)
+    //   - fato: string (required)
+    //   - unidade: string (optional)
+    //   - criado_por: string (required)
+    //   - created_at: string (required, format: date-time)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -133,6 +152,18 @@ service cloud.firestore {
              data.comandante is string && data.motorista is string && data.status in ['ATIVO', 'ENCERRADO'];
     }
 
+    function isValidOccurrenceSS(data) {
+      return hasOnlyAllowedFields(['nr_ss', 'tipo_ss', 'gu_servico', 'unidade', 'criado_por', 'created_at']) &&
+             data.nr_ss is string && data.nr_ss.matches("^\\d{10}$") &&
+             data.tipo_ss in ['Rondas', 'Policiamento em evento', 'Policiamento Medidas Protetivas', 'Atendimento de Chamada'] &&
+             data.gu_servico is list && data.criado_por is string && data.created_at is string;
+    }
+
+    function isValidOccurrenceRO(data) {
+      return hasOnlyAllowedFields(['nr_ro', 'fato', 'unidade', 'criado_por', 'created_at']) &&
+             data.nr_ro is string && data.fato is string && data.criado_por is string && data.created_at is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -166,6 +197,20 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
       allow create: if isAuthenticated() && isValidVtrService(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
       allow update: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidVtrService(request.resource.data) && (isAdmin() || request.resource.data.unidade == resource.data.unidade);
+      allow delete: if isAdmin();
+    }
+
+    match /occurrences_ss/{occurrenceId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidOccurrenceSS(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /occurrences_ro/{occurrenceId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidOccurrenceRO(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 

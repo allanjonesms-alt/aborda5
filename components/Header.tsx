@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole, Shift } from '../types';
+import { BookOpen } from 'lucide-react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import ChangePasswordModal from './ChangePasswordModal';
@@ -168,6 +169,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
               className={`p-2 rounded-lg transition-all flex items-center justify-center ${isHome ? 'bg-navy-900/10 text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
             >
               <i className="fas fa-home text-base sm:text-lg"></i>
+            </Link>
+
+            <Link 
+              to="/manual" 
+              className={`p-2 rounded-lg transition-all flex items-center justify-center ${location.pathname === '/manual' ? 'bg-navy-900/10 text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
+              title="Manual do Usuário"
+            >
+              <BookOpen size={18} />
             </Link>
 
             {user?.role === UserRole.ADMIN && (

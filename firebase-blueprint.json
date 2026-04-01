@@ -285,6 +285,70 @@
         }
       },
       "required": ["userId", "userName", "action", "details", "timestamp"]
+    },
+    "OccurrenceSS": {
+      "title": "OccurrenceSS",
+      "description": "Solicitação de Serviço record",
+      "type": "object",
+      "properties": {
+        "nr_ss": {
+          "type": "string",
+          "description": "SS number (10 digits)"
+        },
+        "tipo_ss": {
+          "type": "string",
+          "enum": ["Rondas", "Policiamento em evento", "Policiamento Medidas Protetivas", "Atendimento de Chamada"],
+          "description": "Type of service"
+        },
+        "gu_servico": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of operators in the group"
+        },
+        "unidade": {
+          "type": "string",
+          "description": "Police unit"
+        },
+        "criado_por": {
+          "type": "string",
+          "description": "User who created the record"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["nr_ss", "tipo_ss", "gu_servico", "criado_por", "created_at"]
+    },
+    "OccurrenceRO": {
+      "title": "OccurrenceRO",
+      "description": "Relatório de Ocorrência record",
+      "type": "object",
+      "properties": {
+        "nr_ro": {
+          "type": "string",
+          "description": "RO number"
+        },
+        "fato": {
+          "type": "string",
+          "description": "Incident type"
+        },
+        "unidade": {
+          "type": "string",
+          "description": "Police unit"
+        },
+        "criado_por": {
+          "type": "string",
+          "description": "User who created the record"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["nr_ro", "fato", "criado_por", "created_at"]
     }
   },
   "firestore": {
@@ -315,6 +379,14 @@
     "/logs/{logId}": {
       "schema": "AuditLog",
       "description": "System audit logs"
+    },
+    "/occurrences_ss/{occurrenceId}": {
+      "schema": "OccurrenceSS",
+      "description": "SS records"
+    },
+    "/occurrences_ro/{occurrenceId}": {
+      "schema": "OccurrenceRO",
+      "description": "RO records"
     }
   }
 }
