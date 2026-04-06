@@ -82,12 +82,12 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    if (user?.role === UserRole.ADMIN) {
+    if (user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) {
       fetchUsers();
     }
   }, [user, fetchUsers]);
 
-  if (user?.role !== UserRole.ADMIN) {
+  if (user?.role !== UserRole.ADMIN && user?.role !== UserRole.MASTER) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="bg-red-50 p-6 rounded-full mb-6"><i className="fas fa-lock text-red-500 text-6xl"></i></div>
@@ -123,6 +123,17 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               </div>
               <h4 className="text-navy-950 font-black uppercase text-sm">Gerenciar Operadores</h4>
               <p className="text-navy-400 text-[10px] font-bold mt-1">Adicionar, editar e resetar senhas.</p>
+            </button>
+
+            <button 
+              onClick={() => navigate('/importar-relatorios')}
+              className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group hover:border-navy-600 transition-all text-left"
+            >
+              <div className="w-12 h-12 bg-navy-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-navy-600/50 transition-colors mb-4">
+                <i className="fas fa-file-pdf text-navy-600 text-xl"></i>
+              </div>
+              <h4 className="text-navy-950 font-black uppercase text-sm">Importar Relatórios</h4>
+              <p className="text-navy-400 text-[10px] font-bold mt-1">Extrair dados de arquivos PDF.</p>
             </button>
 
             <button 

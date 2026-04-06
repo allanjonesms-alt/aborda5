@@ -18,80 +18,88 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [activeShift, setActiveShift] = useState<Shift | null>(null);
+  const [activeShifts, setActiveShifts] = useState<Shift[]>([]);
   const [isStartShiftModalOpen, setIsStartShiftModalOpen] = useState(false);
   const [showEndShiftConfirm, setShowEndShiftConfirm] = useState(false);
 
   const [isEndingShift, setIsEndingShift] = useState(false);
 
-  const fetchActiveShift = useCallback(async () => {
+  const fetchActiveShifts = useCallback(async () => {
     try {
       const shiftsRef = collection(db, 'vtr_services');
       const q = query(
         shiftsRef,
         where('status', '==', 'ATIVO'),
-        orderBy('horario_inicio', 'desc'),
-        limit(1)
+        orderBy('horario_inicio', 'desc')
       );
       
       const querySnapshot = await getDocs(q);
       
-      if (!querySnapshot.empty) {
-        const doc = querySnapshot.docs[0];
-        const data = doc.data();
-        setActiveShift({ 
-          id: doc.id, 
-          ...data,
-          horario_inicio: data.horario_inicio?.toDate?.()?.toISOString() || data.horario_inicio,
-          horario_fim: data.horario_fim?.toDate?.()?.toISOString() || data.horario_fim
-        } as Shift);
-      } else {
-        setActiveShift(null);
-      }
+      const shifts = querySnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        horario_inicio: doc.data().horario_inicio?.toDate?.()?.toISOString() || doc.data().horario_inicio,
+        horario_fim: doc.data().horario_fim?.toDate?.()?.toISOString() || doc.data().horario_fim
+      } as Shift));
+      
+      setActiveShifts(shifts);
     } catch (err) {
-      console.error('Erro inesperado ao buscar serviço:', err);
+      console.error('Erro inesperado ao buscar serviços:', err);
       handleFirestoreError(err, OperationType.LIST, 'vtr_services');
     }
   }, []);
 
   useEffect(() => {
-    fetchActiveShift();
-    const interval = setInterval(fetchActiveShift, 30000);
+    fetchActiveShifts();
+    const interval = setInterval(fetchActiveShifts, 30000);
     return () => clearInterval(interval);
-  }, [fetchActiveShift]);
+  }, [fetchActiveShifts]);
 
-  const handleEndShift = async () => {
-    if (!activeShift || isEndingShift) return;
+  const handleEndShift = async (shiftId?: string) => {
+    if (isEndingShift) return;
     
     setIsEndingShift(true);
     try {
-      console.log('Iniciando encerramento global de serviços ativos...');
+      console.log('Iniciando encerramento de serviços ativos...');
       
-      const shiftsRef = collection(db, 'vtr_services');
-      const q = query(shiftsRef, where('status', '==', 'ATIVO'));
-      const querySnapshot = await getDocs(q);
-      
-      const batch = writeBatch(db);
-      querySnapshot.docs.forEach((document) => {
-        batch.update(document.ref, {
+      if (shiftId) {
+        await updateDoc(doc(db, 'vtr_services', shiftId), {
           status: 'ENCERRADO',
           horario_fim: new Date(),
           encerrado_por_nome: user?.nome || 'Sistema (Manual)'
         });
-      });
-
-      await batch.commit();
-
-      await logAction(
-        user?.id || '',
-        user?.nome || 'Sistema',
-        'SHIFT_ENDED',
-        `Encerramento de serviço: ${activeShift.comandante} (CMD) e ${activeShift.motorista} (MOT)`,
-        { shiftId: activeShift.id }
-      );
+        await logAction(
+          user?.id || '',
+          user?.nome || 'Sistema',
+          'SHIFT_ENDED',
+          `Encerramento de serviço específico: ${shiftId}`,
+          { shiftId }
+        );
+      } else {
+        const shiftsRef = collection(db, 'vtr_services');
+        const q = query(shiftsRef, where('status', '==', 'ATIVO'));
+        const querySnapshot = await getDocs(q);
+        
+        const batch = writeBatch(db);
+        querySnapshot.docs.forEach((document) => {
+          batch.update(document.ref, {
+            status: 'ENCERRADO',
+            horario_fim: new Date(),
+            encerrado_por_nome: user?.nome || 'Sistema (Manual)'
+          });
+        });
+        await batch.commit();
+        await logAction(
+          user?.id || '',
+          user?.nome || 'Sistema',
+          'SHIFT_ENDED',
+          `Encerramento de todos os serviços ativos.`,
+          {}
+        );
+      }
 
       console.log('Serviços encerrados');
-      setActiveShift(null);
+      setActiveShifts([]);
       setShowEndShiftConfirm(false);
       
       // Recarrega para garantir sincronismo total
@@ -133,17 +141,16 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-4">
-            {activeShift ? (
+            {activeShifts.length > 0 ? (
               <div className="flex items-center bg-navy-50 rounded-xl border border-navy-100 px-2 sm:px-3 py-1.5 gap-2 sm:gap-3">
                 <div className="flex flex-col items-end hidden sm:flex">
-                  <span className="text-[8px] font-black text-navy-900 uppercase tracking-widest animate-pulse">Serviço Ativo</span>
-                  <span className="text-[10px] font-bold text-navy-950 uppercase">CMD: {activeShift.comandante}</span>
+                  <span className="text-[8px] font-black text-navy-900 uppercase tracking-widest animate-pulse">{activeShifts.length} Serviço(s) Ativo(s)</span>
                 </div>
                 <button 
                   onClick={() => setShowEndShiftConfirm(true)}
                   disabled={isEndingShift}
                   className={`${isEndingShift ? 'bg-navy-200' : 'bg-red-600 hover:bg-red-500'} text-white w-8 h-8 sm:w-10 sm:h-10 rounded-lg shadow-lg flex items-center justify-center transition-all active:scale-95`}
-                  title="Encerrar Serviço"
+                  title="Encerrar Todos os Serviços"
                 >
                   {isEndingShift ? (
                     <i className="fas fa-spinner fa-spin text-sm"></i>
@@ -179,7 +186,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
               <BookOpen size={18} />
             </Link>
 
-            {user?.role === UserRole.ADMIN && (
+            {(user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) && (
               <Link 
                 to="/configuracoes" 
                 className={`p-2 rounded-lg transition-all flex items-center justify-center ${location.pathname === '/configuracoes' ? 'bg-navy-900/10 text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
@@ -202,7 +209,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
         <StartShiftModal 
           user={user} 
           onClose={() => setIsStartShiftModalOpen(false)} 
-          onStarted={fetchActiveShift} 
+          onStarted={fetchActiveShifts} 
         />
       )}
 
@@ -226,7 +233,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
               </p>
               <div className="flex flex-col gap-3">
                 <button 
-                  onClick={handleEndShift}
+                  onClick={() => handleEndShift()}
                   disabled={isEndingShift}
                   className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl uppercase text-xs shadow-xl shadow-red-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >

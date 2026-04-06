@@ -63,13 +63,13 @@ const MenuButton: React.FC<{
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ user }) => {
-  const [activeShift, setActiveShift] = useState<Shift | null>(null);
-  const [isLoadingShift, setIsLoadingShift] = useState(true);
+  const [activeShifts, setActiveShifts] = useState<Shift[]>([]);
+  const [isLoadingShifts, setIsLoadingShifts] = useState(true);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkShift = async () => {
+    const checkShifts = async () => {
       try {
         const shiftsRef = collection(db, 'vtr_services');
         const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
@@ -77,8 +77,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         let q = query(
           shiftsRef,
           where('status', '==', 'ATIVO'),
-          orderBy('horario_inicio', 'desc'),
-          limit(1)
+          orderBy('horario_inicio', 'desc')
         );
 
         if (unitFilter) {
@@ -86,41 +85,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             shiftsRef,
             where('status', '==', 'ATIVO'),
             unitFilter,
-            orderBy('horario_inicio', 'desc'),
-            limit(1)
+            orderBy('horario_inicio', 'desc')
           );
         }
         
         const querySnapshot = await getDocs(q);
         
-        if (!querySnapshot.empty) {
-          const doc = querySnapshot.docs[0];
-          const data = doc.data();
-          setActiveShift({ 
-            id: doc.id, 
-            ...data,
-            horario_inicio: data.horario_inicio?.toDate?.()?.toISOString() || data.horario_inicio,
-            horario_fim: data.horario_fim?.toDate?.()?.toISOString() || data.horario_fim
-          } as Shift);
-        } else {
-          setActiveShift(null);
-        }
+        const shifts = querySnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data(),
+          horario_inicio: doc.data().horario_inicio?.toDate?.()?.toISOString() || doc.data().horario_inicio,
+          horario_fim: doc.data().horario_fim?.toDate?.()?.toISOString() || doc.data().horario_fim
+        } as Shift));
+        
+        setActiveShifts(shifts);
       } catch (err) {
-        console.error('Erro ao verificar serviço:', err);
+        console.error('Erro ao verificar serviços:', err);
         handleFirestoreError(err, OperationType.LIST, 'vtr_services');
       } finally {
-        setIsLoadingShift(false);
+        setIsLoadingShifts(false);
       }
     };
-    checkShift();
-    const interval = setInterval(checkShift, 10000);
+    checkShifts();
+    const interval = setInterval(checkShifts, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
-  const isUserInShift = (userName: string | undefined, shift: Shift | null) => {
-    if (!userName || !shift) return false;
+  const isUserInAnyShift = (userName: string | undefined, shifts: Shift[]) => {
+    if (!userName || shifts.length === 0) return false;
     const name = userName.toUpperCase();
-    return (
+    return shifts.some(shift => 
       shift.comandante?.toUpperCase() === name ||
       shift.motorista?.toUpperCase() === name ||
       shift.patrulheiro_1?.toUpperCase() === name ||
@@ -128,9 +122,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     );
   };
 
-  const isAdmin = user?.role === UserRole.ADMIN;
-  const inShift = isUserInShift(user?.nome, activeShift);
-  const canRegisterApproach = isAdmin || inShift;
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
+  const inAnyShift = isUserInAnyShift(user?.nome, activeShifts);
+  const canRegisterApproach = isAdmin || inAnyShift;
 
   const handleApproachClick = () => {
     if (isAdmin) {
@@ -138,13 +132,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       return;
     }
 
-    if (!activeShift) {
+    if (activeShifts.length === 0) {
       setAlertMessage('Não é possível registrar abordagem sem um SERVIÇO ATIVO. Inicie o serviço no cabeçalho.');
       return;
     }
     
-    if (!inShift) {
-      setAlertMessage('Acesso Negado: Você não consta como integrante da guarnição deste serviço ativo.');
+    if (!inAnyShift) {
+      setAlertMessage('Acesso Negado: Você não consta como integrante da guarnição de nenhum serviço ativo.');
       return;
     }
 
@@ -179,7 +173,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           label="Nova Abordagem"
           colorClass="bg-navy-600"
           description="Registrar nova abordagem policial em campo."
-          disabled={!canRegisterApproach && !!activeShift}
+          disabled={!canRegisterApproach && activeShifts.length > 0}
         />
         {isAdmin && (
           <MenuButton
@@ -219,6 +213,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           description="Visualização geográfica de ocorrências e endereços."
         />
         <MenuButton
+          to="/estatisticas"
+          icon="fa-chart-pie"
+          label="ESTATÍSTICAS"
+          colorClass="bg-forest-500"
+          description="Quantidade de SS e RO cadastrados."
+        />
+        <MenuButton
           to="/manual"
           icon="fa-book"
           label="Manual do Usuário"
@@ -226,7 +227,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           description="Guia completo de utilização do sistema para operadores."
         />
 
-        {user?.role === UserRole.ADMIN && (
+        {(user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) && (
           <div className="sm:col-span-2">
             <MenuButton
               to="/configuracoes"
@@ -239,14 +240,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         )}
       </div>
 
-      {isLoadingShift ? (
+      {isLoadingShifts ? (
         <div className="mt-8 p-6 bg-navy-50 border border-navy-100 rounded-2xl flex items-center justify-center gap-4">
           <Siren className="w-5 h-5 text-navy-400 animate-pulse" />
           <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">CARREGANDO DADOS...</span>
         </div>
       ) : (
         <>
-          {!activeShift && !isAdmin && (
+          {activeShifts.length === 0 && !isAdmin && (
             <div className="mt-8 p-6 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-4">
               <div className="bg-red-600 w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse">
                 <i className="fas fa-exclamation-triangle text-white text-xl"></i>
@@ -260,7 +261,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             </div>
           )}
 
-          {activeShift && !canRegisterApproach && (
+          {activeShifts.length > 0 && !canRegisterApproach && (
             <div className="mt-8 p-6 bg-navy-50 border border-navy-100 rounded-2xl flex items-center gap-4">
               <div className="bg-navy-900 w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0">
                 <i className="fas fa-lock text-white text-xl"></i>
@@ -268,7 +269,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <div>
                 <h4 className="text-navy-950 font-black uppercase text-xs tracking-widest">Acesso Limitado</h4>
                 <p className="text-navy-500 text-[10px] mt-1 uppercase font-bold leading-relaxed">
-                  Serviço em andamento. Como você não faz parte desta guarnição, seu acesso para novos registros está bloqueado por diretriz operacional.
+                  Serviços em andamento. Como você não faz parte de nenhuma destas guarnições, seu acesso para novos registros está bloqueado por diretriz operacional.
                 </p>
               </div>
             </div>

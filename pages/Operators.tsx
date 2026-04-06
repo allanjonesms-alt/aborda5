@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Siren } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import AddUserModal from '../components/AddUserModal';
 
 interface OperatorsProps {
@@ -13,6 +13,8 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -26,6 +28,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
       
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
       setUsersList(data);
+      setHasChanges(false);
     } catch (err) {
       console.error('Erro ao buscar usuários:', err);
       handleFirestoreError(err, OperationType.LIST, 'users');
@@ -35,12 +38,73 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    if (user?.role === UserRole.ADMIN) {
+    if (user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) {
       fetchUsers();
     }
   }, [user, fetchUsers]);
 
-  if (user?.role !== UserRole.ADMIN) {
+  const handleMove = (index: number, direction: 'up' | 'down', unit: string) => {
+    const unitUsers = usersList.filter(u => (u.unidade || 'SEM UNIDADE') === unit);
+    const globalIndex = usersList.findIndex(u => u.id === unitUsers[index].id);
+    
+    if (direction === 'up' && index > 0) {
+      const prevInUnit = unitUsers[index - 1];
+      const prevGlobalIndex = usersList.findIndex(u => u.id === prevInUnit.id);
+      
+      const newList = [...usersList];
+      const tempOrd = newList[globalIndex].ord;
+      newList[globalIndex].ord = newList[prevGlobalIndex].ord;
+      newList[prevGlobalIndex].ord = tempOrd;
+      
+      // Sort by ord to maintain consistency
+      newList.sort((a, b) => (a.ord || 0) - (b.ord || 0));
+      setUsersList(newList);
+      setHasChanges(true);
+    } else if (direction === 'down' && index < unitUsers.length - 1) {
+      const nextInUnit = unitUsers[index + 1];
+      const nextGlobalIndex = usersList.findIndex(u => u.id === nextInUnit.id);
+      
+      const newList = [...usersList];
+      const tempOrd = newList[globalIndex].ord;
+      newList[globalIndex].ord = newList[nextGlobalIndex].ord;
+      newList[nextGlobalIndex].ord = tempOrd;
+      
+      // Sort by ord to maintain consistency
+      newList.sort((a, b) => (a.ord || 0) - (b.ord || 0));
+      setUsersList(newList);
+      setHasChanges(true);
+    }
+  };
+
+  const handleSaveOrder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const batch = writeBatch(db);
+      usersList.forEach(u => {
+        const userRef = doc(db, 'users', u.id);
+        batch.update(userRef, { ord: u.ord });
+      });
+      await batch.commit();
+      
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'USERS_REORDERED',
+        'Ordenação de operadores atualizada globalmente.',
+        {}
+      );
+      
+      setHasChanges(false);
+      alert('Ordenação salva com sucesso!');
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.WRITE, 'users/reorder');
+      alert('Erro ao salvar ordenação: ' + err.message);
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
+  if (user?.role !== UserRole.ADMIN && user?.role !== UserRole.MASTER) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="bg-red-50 p-6 rounded-full mb-6"><i className="fas fa-lock text-red-500 text-6xl"></i></div>
@@ -115,6 +179,14 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
     u.matricula.includes(searchTerm)
   );
 
+  // Group by unit
+  const groupedUsers = filteredUsers.reduce((acc, u) => {
+    const unit = u.unidade || 'SEM UNIDADE';
+    if (!acc[unit]) acc[unit] = [];
+    acc[unit].push(u);
+    return acc;
+  }, {} as Record<string, User[]>);
+
   return (
     <div className="max-w-6xl mx-auto py-6 space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4">
@@ -129,6 +201,16 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
         </div>
 
         <div className="flex gap-4">
+            {hasChanges && (
+              <button 
+                onClick={handleSaveOrder}
+                disabled={isSavingOrder}
+                className="bg-forest-600 hover:bg-forest-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                {isSavingOrder ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                Salvar Ordenação
+              </button>
+            )}
             <button 
               onClick={() => setIsAddingUser(true)}
               className="bg-navy-600 hover:bg-navy-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -138,55 +220,82 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
         </div>
       </div>
 
-      <section className="px-4 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {isLoading ? (
-            <div className="col-span-full py-20 text-center">
-              <Siren className="w-8 h-8 text-navy-600 mb-4 animate-pulse mx-auto" />
-              <p className="text-navy-400 font-black uppercase text-[10px] tracking-widest">CARREGANDO DADOS...</p>
+      <section className="px-4 pb-10 space-y-12">
+        {isLoading ? (
+          <div className="py-20 text-center">
+            <Siren className="w-8 h-8 text-navy-600 mb-4 animate-pulse mx-auto" />
+            <p className="text-navy-400 font-black uppercase text-[10px] tracking-widest">CARREGANDO DADOS...</p>
+          </div>
+        ) : Object.entries(groupedUsers).map(([unit, users]) => (
+          <div key={unit} className="space-y-6">
+            <div className="flex items-center gap-4 border-l-4 border-navy-600 pl-4">
+              <h3 className="text-xl font-black text-navy-950 uppercase tracking-tighter">{unit}</h3>
+              <span className="bg-navy-100 text-navy-600 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                {users.length} Operadores
+              </span>
             </div>
-          ) : filteredUsers.map(u => (
-            <div key={u.id} className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-4">
-                <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${u.role === UserRole.ADMIN ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-100 text-navy-600 border border-navy-100'}`}>
-                  {u.role}
-                </span>
-              </div>
 
-              <div className="flex items-center space-x-4 mb-6">
-                <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-forest-600/50 transition-colors">
-                  <i className={`fas ${u.role === UserRole.ADMIN ? 'fa-user-shield' : 'fa-user'} text-navy-400 text-xl`}></i>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {users.map((u, idx) => (
+                <div key={u.id} className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 flex items-center gap-2">
+                    <div className="flex flex-col gap-1 mr-2">
+                      <button 
+                        onClick={() => handleMove(idx, 'up', unit)}
+                        disabled={idx === 0}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === 0 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
+                      >
+                        <i className="fas fa-chevron-up text-[10px]"></i>
+                      </button>
+                      <button 
+                        onClick={() => handleMove(idx, 'down', unit)}
+                        disabled={idx === users.length - 1}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === users.length - 1 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
+                      >
+                        <i className="fas fa-chevron-down text-[10px]"></i>
+                      </button>
+                    </div>
+                    <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${u.role === UserRole.ADMIN ? 'bg-red-50 text-red-600 border border-red-100' : u.role === UserRole.MASTER ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-gray-100 text-navy-600 border border-navy-100'}`}>
+                      {u.role}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-4 mb-6">
+                    <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-forest-600/50 transition-colors">
+                      <i className={`fas ${u.role === UserRole.ADMIN ? 'fa-user-shield' : u.role === UserRole.MASTER ? 'fa-crown' : 'fa-user'} text-navy-400 text-xl`}></i>
+                    </div>
+                    <div className="overflow-hidden">
+                      <h4 className="text-navy-950 font-black uppercase text-sm truncate">{u.nome}</h4>
+                      <p className="text-navy-400 text-[10px] font-bold">MAT: {u.matricula} • ORD: {u.ord || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className={`w-2 h-2 rounded-full ${u.primeiro_acesso ? 'bg-forest-600' : 'bg-yellow-500'}`}></div>
+                    <span className="text-[9px] font-black uppercase text-navy-400 tracking-widest">
+                      {u.primeiro_acesso ? 'Acesso Liberado' : 'Senha Pendente'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setEditingUser(u)}
+                      className="bg-gray-50 hover:bg-gray-100 text-navy-900 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100"
+                    >
+                      <i className="fas fa-pencil-alt text-forest-600"></i> Editar
+                    </button>
+                    <button 
+                      onClick={() => handleResetPassword(u)}
+                      className="bg-gray-50 hover:bg-red-50 text-navy-400 hover:text-red-500 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100 hover:border-red-100"
+                    >
+                      <i className="fas fa-key"></i> Resetar
+                    </button>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <h4 className="text-navy-950 font-black uppercase text-sm truncate">{u.nome}</h4>
-                  <p className="text-navy-400 text-[10px] font-bold">MAT: {u.matricula} • ORD: {u.ord || 0}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 mb-6">
-                <div className={`w-2 h-2 rounded-full ${u.primeiro_acesso ? 'bg-forest-600' : 'bg-yellow-500'}`}></div>
-                <span className="text-[9px] font-black uppercase text-navy-400 tracking-widest">
-                  {u.primeiro_acesso ? 'Acesso Liberado' : 'Senha Pendente'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => setEditingUser(u)}
-                  className="bg-gray-50 hover:bg-gray-100 text-navy-900 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100"
-                >
-                  <i className="fas fa-pencil-alt text-forest-600"></i> Editar
-                </button>
-                <button 
-                  onClick={() => handleResetPassword(u)}
-                  className="bg-gray-50 hover:bg-red-50 text-navy-400 hover:text-red-500 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100 hover:border-red-100"
-                >
-                  <i className="fas fa-key"></i> Resetar
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </section>
 
       {isAddingUser && (
@@ -262,6 +371,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                 >
                   <option value={UserRole.ADMIN}>ADMINISTRADOR</option>
                   <option value={UserRole.OPERATOR}>OPERADOR</option>
+                  <option value={UserRole.MASTER}>MASTER</option>
                 </select>
               </div>
 

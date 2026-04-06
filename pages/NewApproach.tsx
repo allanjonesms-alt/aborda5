@@ -88,7 +88,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
             const data = docSnap.id ? { id: docSnap.id, ...docSnap.data() } as DBApproach : null;
             if (data) {
               // Check permissions
-              const isAdmin = user?.role === UserRole.ADMIN;
+              const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
               const isCreator = data.criado_por === user?.id;
 
               if (!isAdmin && !isCreator) {
@@ -183,7 +183,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           );
         };
 
-        const isAdmin = user?.role === UserRole.ADMIN;
+        const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
 
         if (isAdmin) {
           if (data) {

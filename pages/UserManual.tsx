@@ -223,7 +223,7 @@ const UserManual: React.FC = () => {
                 <h4 className="font-black text-xs uppercase tracking-widest">Solicitação de Serviço (SS)</h4>
               </div>
               <ul className="text-xs text-navy-600 space-y-2 list-disc list-inside">
-                <li><strong>Nr da SS:</strong> Digite os 10 dígitos numéricos da solicitação.</li>
+                <li><strong>NUMERO DA SS:</strong> Digite os 10 dígitos numéricos da solicitação.</li>
                 <li><strong>Tipo de SS:</strong> Selecione entre Rondas, Eventos, Medidas Protetivas ou Chamadas.</li>
                 <li><strong>GU de Serviço:</strong> Utilize o campo de busca <Search size={12} className="inline" /> para adicionar os operadores que compõem a guarnição.</li>
                 <li>Clique em <Plus size={12} className="inline" /> para adicionar mais operadores ou <Trash2 size={12} className="inline" /> para remover.</li>

@@ -79,12 +79,12 @@ const Logs: React.FC<LogsProps> = ({ user }) => {
   }, [actionFilter]);
 
   useEffect(() => {
-    if (user?.role === UserRole.ADMIN) {
+    if (user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) {
       fetchLogs();
     }
   }, [user, fetchLogs]);
 
-  if (user?.role !== UserRole.ADMIN) {
+  if (user?.role !== UserRole.ADMIN && user?.role !== UserRole.MASTER) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="bg-red-50 p-6 rounded-full mb-6"><i className="fas fa-lock text-red-500 text-6xl"></i></div>

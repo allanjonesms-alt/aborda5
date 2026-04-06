@@ -20,7 +20,7 @@
         },
         "role": {
           "type": "string",
-          "enum": ["ADMIN", "OPERATOR"],
+          "enum": ["ADMIN", "OPERATOR", "MASTER"],
           "description": "Officer role"
         },
         "primeiro_acesso": {

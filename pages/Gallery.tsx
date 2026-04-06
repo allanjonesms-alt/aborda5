@@ -40,7 +40,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
 
   console.log('Gallery Debug:', { userUnidade: user?.unidade, userCity, matchedCity });
   
-  const isAdmin = user?.role === UserRole.ADMIN;
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
   const [activeFilter, setActiveFilter] = useState(isAdmin ? (matchedCity || 'TODOS') : (matchedCity || 'TODOS'));
   
   // Force filter for non-admins

@@ -1,7 +1,8 @@
 
 export enum UserRole {
   ADMIN = 'ADMIN',
-  OPERATOR = 'OPERATOR'
+  OPERATOR = 'OPERATOR',
+  MASTER = 'MASTER'
 }
 
 export interface User {
@@ -113,13 +114,25 @@ export interface OccurrenceSS {
   unidade?: string;
   criado_por: string;
   created_at: string;
+  date?: string;
+  time?: string;
+  facts?: string;
+  personnel?: string;
+  eventoComunicado?: string;
 }
 
 export interface OccurrenceRO {
   id: string;
   nr_ro: string;
-  fato: string;
+  fato: string | string[];
   unidade?: string;
   criado_por: string;
   created_at: string;
+  roData?: string[];
+  roAddress?: string;
+  date?: string;
+  time?: string;
+  facts?: string;
+  personnel?: string;
+  eventoComunicado?: string;
 }

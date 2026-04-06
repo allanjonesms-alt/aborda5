@@ -12,12 +12,16 @@ import ApproachesList from './pages/ApproachesList';
 import IndividualsList from './pages/IndividualsList';
 import Gallery from './pages/Gallery';
 import Settings from './pages/Settings';
+import ImportReports from './pages/ImportReports';
+import ROList from './pages/ROList';
+import SSList from './pages/SSList';
 import Operators from './pages/Operators';
 import Logs from './pages/Logs';
 import FirstAccess from './pages/FirstAccess';
 import MapPage from './pages/Map';
 import UserManual from './pages/UserManual';
 import Occurrences from './pages/Occurrences';
+import Statistics from './pages/Statistics';
 import { auth as firebaseAuth, logAction } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
@@ -222,10 +226,14 @@ const App: React.FC = () => {
             <Route path="/galeria" element={<Gallery user={auth.user} />} />
             <Route path="/mapas" element={<MapPage user={auth.user} />} />
             <Route path="/configuracoes" element={<Settings user={auth.user} />} />
+            <Route path="/importar-relatorios" element={<ImportReports user={auth.user} />} />
+            <Route path="/lista-ro" element={<ROList user={auth.user} />} />
+            <Route path="/lista-ss" element={<SSList user={auth.user} />} />
+            <Route path="/estatisticas" element={<Statistics user={auth.user} />} />
             <Route path="/operadores" element={<Operators user={auth.user} />} />
             <Route path="/logs" element={<Logs user={auth.user} />} />
             <Route path="/manual" element={<UserManual />} />
-            <Route path="/ocorrencias" element={auth.user?.role === UserRole.ADMIN ? <Occurrences user={auth.user} /> : <Navigate to="/" replace />} />
+            <Route path="/ocorrencias" element={(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.MASTER) ? <Occurrences user={auth.user} /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

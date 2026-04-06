@@ -22,8 +22,38 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const [isCheckingMatricula, setIsCheckingMatricula] = useState(false);
+  const [matriculaExists, setMatriculaExists] = useState(false);
+
+  const checkMatricula = async (matricula: string) => {
+    if (matricula.trim().length < 2) {
+      setMatriculaExists(false);
+      return;
+    }
+    setIsCheckingMatricula(true);
+    try {
+      const q = query(collection(db, 'users'), where('matricula', '==', matricula.trim()));
+      const snap = await getDocs(q);
+      setMatriculaExists(!snap.empty);
+    } catch (err) {
+      console.error("Erro ao verificar matrícula:", err);
+    } finally {
+      setIsCheckingMatricula(false);
+    }
+  };
+
+  const handleMatriculaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setFormData(prev => ({...prev, matricula: val}));
+    checkMatricula(val);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (matriculaExists) {
+      setError('Esta matrícula já está cadastrada.');
+      return;
+    }
     setError('');
     setIsSaving(true);
 
@@ -112,14 +142,24 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2 ml-1">Matrícula</label>
-              <input 
-                type="text" 
-                required
-                className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none transition-all"
-                placeholder="ID"
-                value={formData.matricula}
-                onChange={e => setFormData(prev => ({...prev, matricula: e.target.value}))}
-              />
+              <div className="relative">
+                <input 
+                  type="text" 
+                  required
+                  className={`w-full bg-navy-50 border ${matriculaExists ? 'border-red-500' : 'border-navy-100'} rounded-2xl px-5 py-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none transition-all`}
+                  placeholder="ID"
+                  value={formData.matricula}
+                  onChange={handleMatriculaChange}
+                />
+                {isCheckingMatricula && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <i className="fas fa-spinner fa-spin text-navy-400 text-xs"></i>
+                  </div>
+                )}
+              </div>
+              {matriculaExists && (
+                <p className="text-[8px] text-red-500 font-black uppercase mt-1 ml-2 tracking-widest">Matrícula já cadastrada</p>
+              )}
             </div>
             <div>
               <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2 ml-1">Posição na VTR (ORD)</label>
@@ -170,6 +210,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
             >
               <option value={UserRole.OPERATOR}>OPERADOR</option>
               <option value={UserRole.ADMIN}>ADMINISTRADOR</option>
+              <option value={UserRole.MASTER}>MASTER</option>
             </select>
           </div>
 

@@ -32,7 +32,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     );
 
     const rawRole = String(data.role || '').toUpperCase();
-    const role = rawRole === 'ADMIN' ? UserRole.ADMIN : UserRole.OPERATOR;
+    let role = UserRole.OPERATOR;
+    if (rawRole === 'ADMIN') role = UserRole.ADMIN;
+    else if (rawRole === 'MASTER') role = UserRole.MASTER;
 
     return {
       id: id,

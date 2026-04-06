@@ -12,7 +12,7 @@ service cloud.firestore {
     //   - matricula: string (required) - Officer ID number
     //   - nome: string (required) - Officer name
     //   - senha: string (required) - Officer password
-    //   - role: string (required, enum: ['ADMIN', 'OPERATOR']) - Officer role
+    //   - role: string (required, enum: ['ADMIN', 'OPERATOR', 'MASTER']) - Officer role
     //   - primeiro_acesso: bool (optional) - Whether the officer has completed their first access
     //   - ord: int (optional) - Order for display
     //   - created_at: timestamp (optional) - Creation timestamp
@@ -99,7 +99,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN') ||
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'MASTER')) ||
           (request.auth.token.email == "allanjonesms@gmail.com" && request.auth.token.email_verified == true));
     }
 
@@ -124,7 +124,7 @@ service cloud.firestore {
              data.matricula is string && data.matricula.size() > 0 &&
              data.nome is string && data.nome.size() > 0 &&
              data.senha is string && data.senha.size() >= 5 &&
-             data.role in ['ADMIN', 'OPERATOR'] &&
+             data.role in ['ADMIN', 'OPERATOR', 'MASTER'] &&
              (data.primeiro_acesso is bool) &&
              (data.ord is int) &&
              (data.created_at is timestamp) &&

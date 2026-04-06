@@ -52,10 +52,10 @@ const ViaturaDiagram = ({ assignments, onDrop, activeRole, onRoleSelect }: {
       <div 
         onClick={() => onRoleSelect?.(role)}
         className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center p-1.5 rounded-xl transition-all duration-300 border-2 
-          ${isSelected ? 'ring-2 ring-yellow-500 border-yellow-500 bg-yellow-600/20 scale-105 z-20' : isOver ? 'bg-navy-100 border-navy-500 scale-105' : isOccupied ? 'bg-white border-navy-200 shadow-lg border-solid' : 'bg-navy-50 border-navy-100 border-dashed'}
+          ${isSelected ? 'ring-2 ring-yellow-500 border-yellow-500 bg-white scale-105 z-20' : isOver ? 'bg-navy-100 border-navy-500 scale-105' : isOccupied ? 'bg-white border-navy-200 shadow-lg border-solid' : 'bg-white border-navy-100 border-dashed'}
           cursor-pointer
         `}
-        style={{ left: x, top: y, width: '120px', height: '80px' }}
+        style={{ left: x, top: y, width: '140px', height: '90px' }}
         onDragOver={(e) => handleDragOver(e, role)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, role)}
@@ -219,7 +219,7 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 bg-navy-950/80 backdrop-blur-md overflow-hidden">
-      <div className="bg-white border border-navy-100 w-full max-w-6xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-full max-h-[580px]">
+      <div className="bg-white border border-navy-100 w-full max-w-6xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[95vh] md:h-full md:max-h-[580px]">
         
         {/* LEFT SIDEBAR: OPERATORS LIST (3 COLUMNS) */}
         <div className="w-full md:w-[480px] bg-navy-50 border-r border-navy-100 flex flex-col overflow-hidden">
@@ -237,7 +237,7 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-2 flex flex-col sm:grid sm:grid-cols-3 gap-1.5 content-start custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
             {/* Desktop View: Grid of Cards */}
             <div className="hidden sm:grid grid-cols-3 gap-1.5 w-full">
               {filteredOperators.map(op => {
@@ -247,15 +247,15 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
                     key={op.id}
                     draggable={!isAssigned}
                     onDragStart={(e) => handleDragStart(e, op.nome.toUpperCase())}
-                    className={`p-0 rounded-xl border transition-all flex items-center gap-1.5 cursor-grab active:cursor-grabbing group min-w-0 h-12
-                      ${isAssigned ? 'bg-navy-100 border-navy-200 opacity-30 cursor-not-allowed' : 'bg-white border-navy-100 hover:border-navy-300 hover:bg-navy-50 shadow-sm'}
+                    className={`p-0 rounded-xl border transition-all flex items-center gap-1.5 cursor-grab active:cursor-grabbing group min-w-0 h-14
+                      ${isAssigned ? 'bg-navy-100 border-navy-200 opacity-30 cursor-not-allowed' : 'bg-navy-900 border-navy-800 hover:border-navy-600 hover:bg-navy-800 shadow-sm'}
                     `}
                   >
-                    <div className={`w-8 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl ${isAssigned ? 'bg-navy-200 text-navy-400' : 'bg-navy-900 text-white'}`}>
+                    <div className={`w-8 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl ${isAssigned ? 'bg-navy-200 text-navy-400' : 'bg-navy-950 text-white'}`}>
                       <i className="fas fa-id-badge text-xs"></i>
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
-                      <p className="text-[10px] font-black text-navy-950 uppercase truncate leading-none mb-0.5">{op.nome}</p>
+                      <p className="text-[10px] font-black text-white uppercase truncate leading-none mb-0.5">{op.nome}</p>
                       <p className="text-[8px] font-bold text-navy-400 uppercase tracking-tighter leading-none">ID: {op.matricula}</p>
                     </div>
                   </div>
@@ -289,8 +289,8 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
                 );
               })}
               {!searchTerm && (
-                <div className="flex flex-col items-center justify-center py-8 opacity-30">
-                  <i className="fas fa-search text-2xl mb-2 text-navy-300"></i>
+                <div className="flex flex-col items-center justify-center py-4 opacity-30">
+                  <i className="fas fa-search text-xl mb-1 text-navy-300"></i>
                   <p className="text-[8px] font-black uppercase tracking-widest text-navy-400">Pesquise para selecionar</p>
                 </div>
               )}
