@@ -22,6 +22,7 @@ import MapPage from './pages/Map';
 import UserManual from './pages/UserManual';
 import Occurrences from './pages/Occurrences';
 import Statistics from './pages/Statistics';
+import SystemVersions from './pages/SystemVersions';
 import { auth as firebaseAuth, logAction } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
@@ -232,6 +233,7 @@ const App: React.FC = () => {
             <Route path="/estatisticas" element={<Statistics user={auth.user} />} />
             <Route path="/operadores" element={<Operators user={auth.user} />} />
             <Route path="/logs" element={<Logs user={auth.user} />} />
+            <Route path="/versoes" element={<SystemVersions user={auth.user} />} />
             <Route path="/manual" element={<UserManual />} />
             <Route path="/ocorrencias" element={(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.MASTER) ? <Occurrences user={auth.user} /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

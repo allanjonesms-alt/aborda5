@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Siren } from 'lucide-react';
-import { User, UserRole, Shift, Unit } from '../types';
+import { User, UserRole, Shift, Unit, SystemVersion } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import TacticalLogo from '../components/TacticalLogo';
@@ -67,7 +67,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [isLoadingShifts, setIsLoadingShifts] = useState(true);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [unitFeatures, setUnitFeatures] = useState<string[] | null>(null);
+  const [latestVersion, setLatestVersion] = useState<string>('V1.0');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const q = query(collection(db, 'system_versions'), orderBy('date', 'desc'), limit(1));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const versionData = snapshot.docs[0].data() as SystemVersion;
+        setLatestVersion(versionData.version);
+      }
+    }, (err) => {
+      console.error('Erro ao buscar versão:', err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!user?.unidade) {
@@ -321,7 +335,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <div className="flex items-center space-x-4">
           <TacticalLogo size="md" className="opacity-80" />
           <div>
-            <h4 className="text-navy-900 font-bold uppercase text-xs tracking-widest">SGA5 V1.0</h4>
+            <h4 className="text-navy-900 font-bold uppercase text-xs tracking-widest">SGA5 {latestVersion}</h4>
             <p className="text-navy-400 text-[10px] mt-1 uppercase font-black tracking-[0.2em]">
               CREATED BY SGT JONES • MONITORAMENTO OPERACIONAL ATIVO
             </p>

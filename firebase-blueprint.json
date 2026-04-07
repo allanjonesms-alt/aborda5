@@ -350,29 +350,36 @@
       },
       "required": ["nr_ro", "fato", "criado_por", "created_at"]
     },
-    "Unit": {
-      "title": "Unit",
-      "description": "Police unit record",
+    "SystemVersion": {
+      "title": "SystemVersion",
+      "description": "System version history",
       "type": "object",
       "properties": {
-        "nome": {
+        "version": {
           "type": "string",
-          "description": "Unit name"
+          "description": "Version number (e.g., 1.0.0)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ATUALIZAÇÃO", "REPARO"],
+          "description": "Type of version update"
+        },
+        "description": {
+          "type": "string",
+          "description": "Changes description"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of the update"
         },
         "created_at": {
           "type": "string",
           "format": "date-time",
           "description": "Creation timestamp"
-        },
-        "enabled_features": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of enabled dashboard features"
         }
       },
-      "required": ["nome"]
+      "required": ["version", "type", "description", "date"]
     }
   },
   "firestore": {
@@ -415,6 +422,10 @@
     "/units/{unitId}": {
       "schema": "Unit",
       "description": "Police units"
+    },
+    "/system_versions/{versionId}": {
+      "schema": "SystemVersion",
+      "description": "System version history"
     }
   }
 }

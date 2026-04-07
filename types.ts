@@ -98,6 +98,15 @@ export interface Unit {
   enabled_features?: string[];
 }
 
+export interface SystemVersion {
+  id: string;
+  version: string;
+  type: 'ATUALIZAÇÃO' | 'REPARO';
+  description: string;
+  date: string;
+  created_at?: any;
+}
+
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;

@@ -159,6 +159,17 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               <h4 className="text-navy-950 font-black uppercase text-sm">Gerenciar Unidades</h4>
               <p className="text-navy-400 text-[10px] font-bold mt-1">Adicionar e remover unidades do sistema.</p>
             </button>
+
+            <button 
+              onClick={() => navigate('/versoes')}
+              className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group hover:border-navy-600 transition-all text-left"
+            >
+              <div className="w-12 h-12 bg-navy-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-navy-600/50 transition-colors mb-4">
+                <i className="fas fa-code-branch text-navy-600 text-xl"></i>
+              </div>
+              <h4 className="text-navy-950 font-black uppercase text-sm">Versão</h4>
+              <p className="text-navy-400 text-[10px] font-bold mt-1">Cadastrar nova versão do sistema.</p>
+            </button>
         </div>
       </section>
 
