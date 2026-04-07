@@ -91,6 +91,13 @@ export interface DBApproach {
   foto_path?: string;
 }
 
+export interface Unit {
+  id: string;
+  nome: string;
+  created_at?: any;
+  enabled_features?: string[];
+}
+
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;

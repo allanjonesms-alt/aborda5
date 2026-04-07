@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, query, where, getDocs, writeBatch, doc, orderBy } from 'firebase/firestore';
-import { UserRole, User } from '../types';
+import { collection, query, where, getDocs, writeBatch, doc, orderBy, onSnapshot } from 'firebase/firestore';
+import { UserRole, User, Unit } from '../types';
 
 interface AddUserModalProps {
   onClose: () => void;
@@ -21,6 +21,17 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [units, setUnits] = useState<Unit[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'units'), orderBy('nome', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('AddUserModal: Units snapshot received, size:', snapshot.size);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+      setUnits(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [isCheckingMatricula, setIsCheckingMatricula] = useState(false);
   const [matriculaExists, setMatriculaExists] = useState(false);
@@ -181,12 +192,15 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
               onChange={e => setFormData(prev => ({...prev, unidade: e.target.value}))}
             >
               <option value="">Selecione a Unidade</option>
-              <option value="5° BPM">5° BPM</option>
-              <option value="5°BPM-Sede">5°BPM-Sede</option>
-              <option value="2ª CIA - Rio Verde">2ª CIA - Rio Verde</option>
-              <option value="3° Pelotão - Alcinópolis">3° Pelotão - Alcinópolis</option>
-              <option value="2° Pelotão - Pedro Gomes">2° Pelotão - Pedro Gomes</option>
+              {units.map(unit => (
+                <option key={unit.id} value={unit.nome}>{unit.nome}</option>
+              ))}
             </select>
+            {units.length === 0 && (
+              <p className="text-[8px] text-red-500 font-black uppercase mt-1 ml-2 tracking-widest">
+                Nenhuma unidade cadastrada. Vá em Configurações para gerenciar.
+              </p>
+            )}
           </div>
 
           <div>

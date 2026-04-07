@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Siren } from 'lucide-react';
-import { User, UserRole } from '../types';
+import { User, UserRole, Unit } from '../types';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, writeBatch, deleteDoc, onSnapshot } from 'firebase/firestore';
 import AddUserModal from '../components/AddUserModal';
 
 interface OperatorsProps {
@@ -19,6 +19,17 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const isMaster = user?.role === UserRole.MASTER;
+  const [units, setUnits] = useState<Unit[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'units'), orderBy('nome', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+      setUnits(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -114,7 +125,32 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
     );
   }
 
+  const handleDeleteUser = async (targetUser: User) => {
+    if (!isMaster) return;
+    if (!confirm(`TEM CERTEZA QUE DESEJA EXCLUIR O OPERADOR ${targetUser.nome}?\nEsta ação é irreversível e removerá todos os dados de acesso deste usuário.`)) return;
+
+    try {
+      const userRef = doc(db, 'users', targetUser.id);
+      await deleteDoc(userRef);
+
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        'USER_DELETED',
+        `Operador ${targetUser.nome} (MAT: ${targetUser.matricula}) excluído permanentemente pelo MASTER.`,
+        { targetUserId: targetUser.id }
+      );
+
+      alert('Operador excluído com sucesso!');
+      fetchUsers();
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.DELETE, `users/${targetUser.id}`);
+      alert('Erro ao excluir: ' + err.message);
+    }
+  };
+
   const handleResetPassword = async (targetUser: User) => {
+    if (!isMaster) return;
     const defaultPassword = 'Mudar@123';
     if (!confirm(`Deseja resetar a senha de ${targetUser.nome}?\nA nova senha será: ${defaultPassword}\nO usuário será obrigado a trocá-la no próximo acesso.`)) return;
 
@@ -143,7 +179,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser) return;
+    if (!editingUser || !isMaster) return;
     setIsSaving(true);
 
     try {
@@ -201,7 +237,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
         </div>
 
         <div className="flex gap-4">
-            {hasChanges && (
+            {hasChanges && isMaster && (
               <button 
                 onClick={handleSaveOrder}
                 disabled={isSavingOrder}
@@ -211,12 +247,14 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                 Salvar Ordenação
               </button>
             )}
-            <button 
-              onClick={() => setIsAddingUser(true)}
-              className="bg-navy-600 hover:bg-navy-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              <i className="fas fa-user-plus"></i> Novo Operador
-            </button>
+            {isMaster && (
+              <button 
+                onClick={() => setIsAddingUser(true)}
+                className="bg-navy-600 hover:bg-navy-500 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <i className="fas fa-user-plus"></i> Novo Operador
+              </button>
+            )}
         </div>
       </div>
 
@@ -239,22 +277,24 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
               {users.map((u, idx) => (
                 <div key={u.id} className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-4 flex items-center gap-2">
-                    <div className="flex flex-col gap-1 mr-2">
-                      <button 
-                        onClick={() => handleMove(idx, 'up', unit)}
-                        disabled={idx === 0}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === 0 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
-                      >
-                        <i className="fas fa-chevron-up text-[10px]"></i>
-                      </button>
-                      <button 
-                        onClick={() => handleMove(idx, 'down', unit)}
-                        disabled={idx === users.length - 1}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === users.length - 1 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
-                      >
-                        <i className="fas fa-chevron-down text-[10px]"></i>
-                      </button>
-                    </div>
+                    {isMaster && (
+                      <div className="flex flex-col gap-1 mr-2">
+                        <button 
+                          onClick={() => handleMove(idx, 'up', unit)}
+                          disabled={idx === 0}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === 0 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
+                        >
+                          <i className="fas fa-chevron-up text-[10px]"></i>
+                        </button>
+                        <button 
+                          onClick={() => handleMove(idx, 'down', unit)}
+                          disabled={idx === users.length - 1}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === users.length - 1 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
+                        >
+                          <i className="fas fa-chevron-down text-[10px]"></i>
+                        </button>
+                      </div>
+                    )}
                     <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${u.role === UserRole.ADMIN ? 'bg-red-50 text-red-600 border border-red-100' : u.role === UserRole.MASTER ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-gray-100 text-navy-600 border border-navy-100'}`}>
                       {u.role}
                     </span>
@@ -278,18 +318,27 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => setEditingUser(u)}
-                      className="bg-gray-50 hover:bg-gray-100 text-navy-900 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100"
-                    >
-                      <i className="fas fa-pencil-alt text-forest-600"></i> Editar
-                    </button>
-                    <button 
-                      onClick={() => handleResetPassword(u)}
-                      className="bg-gray-50 hover:bg-red-50 text-navy-400 hover:text-red-500 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100 hover:border-red-100"
-                    >
-                      <i className="fas fa-key"></i> Resetar
-                    </button>
+                    {isMaster && (
+                      <>
+                        <button 
+                          onClick={() => setEditingUser(u)}
+                          className="bg-gray-50 hover:bg-gray-100 text-navy-900 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100"
+                        >
+                          <i className="fas fa-pencil-alt text-forest-600"></i> Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteUser(u)}
+                          className="bg-gray-50 hover:bg-red-50 text-navy-400 hover:text-red-500 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100 hover:border-red-100"
+                        >
+                          <i className="fas fa-trash-alt"></i> Excluir
+                        </button>
+                      </>
+                    )}
+                    {!isMaster && (
+                      <div className="col-span-2 py-3 text-center">
+                        <span className="text-[8px] font-black uppercase text-navy-300 tracking-widest">Acesso de Leitura</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -354,11 +403,9 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                   className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
                 >
                   <option value="">Selecione a Unidade</option>
-                  <option value="5° BPM">5° BPM</option>
-                  <option value="5°BPM-Sede">5°BPM-Sede</option>
-                  <option value="2ª CIA - Rio Verde">2ª CIA - Rio Verde</option>
-                  <option value="3° Pelotão - Alcinópolis">3° Pelotão - Alcinópolis</option>
-                  <option value="2° Pelotão - Pedro Gomes">2° Pelotão - Pedro Gomes</option>
+                  {units.map(unit => (
+                    <option key={unit.id} value={unit.nome}>{unit.nome}</option>
+                  ))}
                 </select>
               </div>
 

@@ -349,6 +349,30 @@
         }
       },
       "required": ["nr_ro", "fato", "criado_por", "created_at"]
+    },
+    "Unit": {
+      "title": "Unit",
+      "description": "Police unit record",
+      "type": "object",
+      "properties": {
+        "nome": {
+          "type": "string",
+          "description": "Unit name"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "enabled_features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of enabled dashboard features"
+        }
+      },
+      "required": ["nome"]
     }
   },
   "firestore": {
@@ -387,6 +411,10 @@
     "/occurrences_ro/{occurrenceId}": {
       "schema": "OccurrenceRO",
       "description": "RO records"
+    },
+    "/units/{unitId}": {
+      "schema": "Unit",
+      "description": "Police units"
     }
   }
 }

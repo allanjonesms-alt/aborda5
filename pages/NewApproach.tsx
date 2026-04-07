@@ -37,7 +37,9 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const residentialAddressRef = useRef<HTMLInputElement>(null);
+  const localAddressRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<any>(null);
+  const localAutocompleteInstance = useRef<any>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
 
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
@@ -236,25 +238,24 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
   }, [isManualDateTime]);
 
   const initAutocomplete = () => {
-    if (!residentialAddressRef.current || !(window as any).google || !(window as any).google.maps || !(window as any).google.maps.places) return;
+    if (!(window as any).google || !(window as any).google.maps || !(window as any).google.maps.places) return;
+    const google = (window as any).google;
+    const bounds = {
+      north: -17.4,
+      south: -19.5,
+      east: -53.5,
+      west: -55.0,
+    };
 
-    try {
-      const google = (window as any).google;
-      const bounds = {
-        north: -17.4,
-        south: -19.5,
-        east: -53.5,
-        west: -55.0,
-      };
+    const options = {
+      componentRestrictions: { country: "br" },
+      bounds: bounds,
+      strictBounds: true,
+      fields: ['formatted_address', 'address_components', 'geometry'],
+      types: ['address']
+    };
 
-      const options = {
-        componentRestrictions: { country: "br" },
-        bounds: bounds,
-        strictBounds: true,
-        fields: ['formatted_address', 'address_components', 'geometry'],
-        types: ['address']
-      };
-
+    if (residentialAddressRef.current) {
       autocompleteInstance.current = new google.maps.places.Autocomplete(
         residentialAddressRef.current, 
         options
@@ -273,8 +274,27 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
 
         setIndividualData(prev => ({ ...prev, endereco_residencial: place.formatted_address }));
       });
-    } catch (err) {
-      console.error("Erro ao inicializar Autocomplete:", err);
+    }
+
+    if (localAddressRef.current) {
+      localAutocompleteInstance.current = new google.maps.places.Autocomplete(
+        localAddressRef.current, 
+        options
+      );
+
+      localAutocompleteInstance.current.addListener('place_changed', () => {
+        const place = localAutocompleteInstance.current.getPlace();
+        if (!place.formatted_address) return;
+
+        if (!checkCity(place.address_components || [])) {
+          alert(`LOCAL FORA DE ÁREA!\n\nAs buscas estão restritas às cidades permitidas:\n${allowedCities.join(', ')}`);
+          if (localAddressRef.current) localAddressRef.current.value = '';
+          setApproachData(prev => ({ ...prev, local: '' }));
+          return;
+        }
+
+        setApproachData(prev => ({ ...prev, local: place.formatted_address }));
+      });
     }
   };
 
@@ -555,10 +575,11 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
               <div className="relative group">
                 <input 
                   type="text" 
-                  readOnly
-                  placeholder="Selecione no mapa..."
-                  className="w-full bg-white border border-navy-100 text-navy-950 pl-4 pr-12 py-4 rounded-2xl outline-none font-bold text-sm cursor-default" 
+                  ref={localAddressRef}
+                  placeholder="Digite ou selecione no mapa..."
+                  className="w-full bg-white border border-navy-100 text-navy-950 pl-4 pr-12 py-4 rounded-2xl outline-none font-bold text-sm" 
                   value={approachData.local}
+                  onChange={e => setApproachData(prev => ({...prev, local: e.target.value}))}
                 />
                 <button 
                   type="button"

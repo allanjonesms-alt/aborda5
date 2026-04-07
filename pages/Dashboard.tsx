@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Siren } from 'lucide-react';
-import { User, UserRole, Shift } from '../types';
+import { User, UserRole, Shift, Unit } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import TacticalLogo from '../components/TacticalLogo';
 import TacticalAlert from '../components/TacticalAlert';
 
@@ -66,7 +66,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [activeShifts, setActiveShifts] = useState<Shift[]>([]);
   const [isLoadingShifts, setIsLoadingShifts] = useState(true);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [unitFeatures, setUnitFeatures] = useState<string[] | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user?.unidade) {
+      setUnitFeatures(null);
+      return;
+    }
+
+    const q = query(collection(db, 'units'), where('nome', '==', user.unidade));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const unitData = snapshot.docs[0].data() as Unit;
+        setUnitFeatures(unitData.enabled_features || null);
+      } else {
+        setUnitFeatures(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.unidade]);
 
   useEffect(() => {
     const checkShifts = async () => {
@@ -126,6 +146,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const inAnyShift = isUserInAnyShift(user?.nome, activeShifts);
   const canRegisterApproach = isAdmin || inAnyShift;
 
+  const isFeatureEnabled = (featureId: string) => {
+    if (isAdmin) return true; // Admins see everything
+    if (!unitFeatures) return true; // Default to all enabled if not set
+    return unitFeatures.includes(featureId);
+  };
+
   const handleApproachClick = () => {
     if (isAdmin) {
       navigate('/nova-abordagem');
@@ -167,15 +193,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
-        <MenuButton
-          onClick={handleApproachClick}
-          icon="fa-file-signature"
-          label="Nova Abordagem"
-          colorClass="bg-navy-600"
-          description="Registrar nova abordagem policial em campo."
-          disabled={!canRegisterApproach && activeShifts.length > 0}
-        />
-        {isAdmin && (
+        {isFeatureEnabled('nova-abordagem') && (
+          <MenuButton
+            onClick={handleApproachClick}
+            icon="fa-file-signature"
+            label="Nova Abordagem"
+            colorClass="bg-navy-600"
+            description="Registrar nova abordagem policial em campo."
+            disabled={!canRegisterApproach && activeShifts.length > 0}
+          />
+        )}
+        {isAdmin && isFeatureEnabled('ocorrencias') && (
           <MenuButton
             to="/ocorrencias"
             icon="fa-file-invoice"
@@ -184,48 +212,60 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             description="SS e RO Realizados."
           />
         )}
-        <MenuButton
-          to="/abordagens"
-          icon="fa-history"
-          label="Abordagens"
-          colorClass="bg-navy-700"
-          description="Consultar histórico de registros realizados."
-        />
-        <MenuButton
-          to="/individuos"
-          icon="fa-user-shield"
-          label="Indivíduos"
-          colorClass="bg-forest-600"
-          description="Base de dados e cadastro de indivíduos."
-        />
-        <MenuButton
-          to="/galeria"
-          icon="fa-th"
-          label="Galeria"
-          colorClass="bg-navy-500"
-          description="Visualizar registros fotográficos do sistema."
-        />
-        <MenuButton
-          to="/mapas"
-          icon="fa-map-location-dot"
-          label="Mapas"
-          colorClass="bg-forest-700"
-          description="Visualização geográfica de ocorrências e endereços."
-        />
-        <MenuButton
-          to="/estatisticas"
-          icon="fa-chart-pie"
-          label="ESTATÍSTICAS"
-          colorClass="bg-forest-500"
-          description="Quantidade de SS e RO cadastrados."
-        />
-        <MenuButton
-          to="/manual"
-          icon="fa-book"
-          label="Manual do Usuário"
-          colorClass="bg-navy-800"
-          description="Guia completo de utilização do sistema para operadores."
-        />
+        {isFeatureEnabled('abordagens') && (
+          <MenuButton
+            to="/abordagens"
+            icon="fa-history"
+            label="Abordagens"
+            colorClass="bg-navy-700"
+            description="Consultar histórico de registros realizados."
+          />
+        )}
+        {isFeatureEnabled('individuos') && (
+          <MenuButton
+            to="/individuos"
+            icon="fa-user-shield"
+            label="Indivíduos"
+            colorClass="bg-forest-600"
+            description="Base de dados e cadastro de indivíduos."
+          />
+        )}
+        {isFeatureEnabled('galeria') && (
+          <MenuButton
+            to="/galeria"
+            icon="fa-th"
+            label="Galeria"
+            colorClass="bg-navy-500"
+            description="Visualizar registros fotográficos do sistema."
+          />
+        )}
+        {isFeatureEnabled('mapas') && (
+          <MenuButton
+            to="/mapas"
+            icon="fa-map-location-dot"
+            label="Mapas"
+            colorClass="bg-forest-700"
+            description="Visualização geográfica de ocorrências e endereços."
+          />
+        )}
+        {isFeatureEnabled('estatisticas') && (
+          <MenuButton
+            to="/estatisticas"
+            icon="fa-chart-pie"
+            label="ESTATÍSTICAS"
+            colorClass="bg-forest-500"
+            description="Quantidade de SS e RO cadastrados."
+          />
+        )}
+        {isFeatureEnabled('manual') && (
+          <MenuButton
+            to="/manual"
+            icon="fa-book"
+            label="Manual do Usuário"
+            colorClass="bg-navy-800"
+            description="Guia completo de utilização do sistema para operadores."
+          />
+        )}
 
         {(user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) && (
           <div className="sm:col-span-2">

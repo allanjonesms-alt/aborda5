@@ -87,6 +87,13 @@ service cloud.firestore {
     //   - criado_por: string (required)
     //   - created_at: string (required, format: date-time)
     //
+    // Collection: units
+    // Document ID: unitId
+    // Fields:
+    //   - nome: string (required) - Unit name
+    //   - created_at: timestamp (optional) - Creation timestamp
+    //   - enabled_features: list (optional) - List of enabled dashboard features
+    //
     // ===============================================================
 
     // ===============================================================
@@ -128,7 +135,13 @@ service cloud.firestore {
              (data.primeiro_acesso is bool) &&
              (data.ord is int) &&
              (data.created_at is timestamp) &&
-             (data.unidade in ['5° BPM', '5°BPM-Sede', '2ª CIA - Rio Verde', '3° Pelotão - Alcinópolis', '2° Pelotão - Pedro Gomes'] || !('unidade' in data));
+             (!('unidade' in data) || data.unidade is string);
+    }
+
+    function isValidUnit(data) {
+      return hasOnlyAllowedFields(['nome', 'created_at', 'enabled_features']) &&
+             data.nome is string && data.nome.size() > 0 &&
+             (!('enabled_features' in data) || data.enabled_features is list);
     }
 
     function isValidIndividual(data) {
@@ -212,6 +225,11 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidOccurrenceRO(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    match /units/{unitId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidUnit(request.resource.data);
     }
 
     match /logs/{logId} {

@@ -6,6 +6,7 @@ import { User, UserRole } from '../types';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, orderBy, getDocs, doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import AddUserModal from '../components/AddUserModal';
+import ManageUnitsModal from '../components/ManageUnitsModal';
 
 interface SettingsProps {
   user: User | null;
@@ -22,6 +23,7 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isManagingUnits, setIsManagingUnits] = useState(false);
 
   const importIndividuals = async () => {
     console.log('Iniciando importação de indivíduos...');
@@ -146,8 +148,26 @@ const Settings: React.FC<SettingsProps> = ({ user }) => {
               <h4 className="text-navy-950 font-black uppercase text-sm">Auditoria / Logs</h4>
               <p className="text-navy-400 text-[10px] font-bold mt-1">Verificar histórico de ações.</p>
             </button>
+
+            <button 
+              onClick={() => setIsManagingUnits(true)}
+              className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group hover:border-navy-600 transition-all text-left"
+            >
+              <div className="w-12 h-12 bg-navy-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-navy-600/50 transition-colors mb-4">
+                <i className="fas fa-building text-navy-600 text-xl"></i>
+              </div>
+              <h4 className="text-navy-950 font-black uppercase text-sm">Gerenciar Unidades</h4>
+              <p className="text-navy-400 text-[10px] font-bold mt-1">Adicionar e remover unidades do sistema.</p>
+            </button>
         </div>
       </section>
+
+      {isManagingUnits && (
+        <ManageUnitsModal 
+          onClose={() => setIsManagingUnits(false)} 
+          user={user}
+        />
+      )}
     </div>
   );
 };
