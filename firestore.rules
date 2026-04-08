@@ -163,6 +163,17 @@ service cloud.firestore {
              data.individuo_id is string && data.path is string;
     }
 
+    function isValidRelationship(data) {
+      return hasOnlyAllowedFields(['individuo_id', 'relacionado_id', 'tipo', 'created_by', 'created_at']) &&
+             data.individuo_id is string && data.relacionado_id is string &&
+             data.tipo in ['COMPARSA', 'FAMILIAR'];
+    }
+
+    function isValidAttachment(data) {
+      return hasOnlyAllowedFields(['individuo_id', 'nome_arquivo', 'tipo_mime', 'path', 'legenda', 'created_by', 'created_at']) &&
+             data.individuo_id is string && data.nome_arquivo is string && data.path is string;
+    }
+
     function isValidApproach(data) {
       return hasOnlyAllowedFields(['data', 'horario', 'local', 'relatorio', 'objetos_apreendidos', 'resultado', 'individuo_nome', 'individuo_id', 'foto_path', 'unidade', 'criado_por', 'created_at', 'updated_at']) &&
              data.data is string && data.horario is string && data.local is string;
@@ -204,6 +215,20 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidPhoto(request.resource.data);
       allow update: if isAuthenticated() && isValidPhoto(request.resource.data);
+      allow delete: if isAdmin() || isMaster();
+    }
+
+    match /individual_relationships/{relationshipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidRelationship(request.resource.data);
+      allow update: if isAuthenticated() && isValidRelationship(request.resource.data);
+      allow delete: if isAdmin() || isMaster();
+    }
+
+    match /individual_attachments/{attachmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAttachment(request.resource.data);
+      allow update: if isAuthenticated() && isValidAttachment(request.resource.data);
       allow delete: if isAdmin() || isMaster();
     }
 

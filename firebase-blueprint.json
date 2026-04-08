@@ -380,6 +380,36 @@
         }
       },
       "required": ["version", "type", "description", "date"]
+    },
+    "IndividualRelationship": {
+      "title": "IndividualRelationship",
+      "description": "Relationship between two individuals",
+      "type": "object",
+      "properties": {
+        "individuo_id": {
+          "type": "string",
+          "description": "Reference to the main individual"
+        },
+        "relacionado_id": {
+          "type": "string",
+          "description": "Reference to the related individual"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": ["COMPARSA", "FAMILIAR"],
+          "description": "Type of relationship"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User who created the relationship"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["individuo_id", "relacionado_id", "tipo"]
     }
   },
   "firestore": {
@@ -398,6 +428,10 @@
     "/individual_attachments/{attachmentId}": {
       "schema": "IndividualAttachment",
       "description": "Attachments for individuals"
+    },
+    "/individual_relationships/{relationshipId}": {
+      "schema": "IndividualRelationship",
+      "description": "Relationships between individuals"
     },
     "/approaches/{approachId}": {
       "schema": "Approach",

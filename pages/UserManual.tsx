@@ -36,7 +36,7 @@ const UserManual: React.FC = () => {
       heightLeft -= pdf.internal.pageSize.getHeight();
     }
     
-    pdf.save('Manual_Usuario_SGA5.pdf');
+    pdf.save('Manual_Usuario_ARGOS.pdf');
   };
 
   return (
@@ -44,7 +44,7 @@ const UserManual: React.FC = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-black text-navy-950 uppercase tracking-tighter">Manual do Usuário</h1>
-          <p className="text-navy-500 text-sm font-bold uppercase tracking-widest mt-1">SGA5 - Sistema de Gestão de Abordagens</p>
+          <p className="text-navy-500 text-sm font-bold uppercase tracking-widest mt-1">ARGOS - Sistema de Gestão de Abordagens</p>
         </div>
         <button 
           onClick={downloadPDF}
@@ -60,7 +60,7 @@ const UserManual: React.FC = () => {
           <div className="bg-navy-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
             <Shield size={40} className="text-white" />
           </div>
-          <h2 className="text-4xl font-black text-navy-950 uppercase tracking-tighter mb-2">SGA5</h2>
+          <h2 className="text-4xl font-black text-navy-950 uppercase tracking-tighter mb-2">ARGOS</h2>
           <p className="text-navy-400 font-black uppercase text-[10px] tracking-[0.3em]">Guia de Operações para Operadores</p>
         </div>
 
@@ -71,7 +71,7 @@ const UserManual: React.FC = () => {
             <h3 className="text-xl font-black text-navy-950 uppercase tracking-tight">1. Introdução</h3>
           </div>
           <p className="text-navy-600 leading-relaxed">
-            O SGA5 é uma ferramenta desenvolvida para otimizar o registro e a consulta de abordagens policiais. 
+            O ARGOS é uma ferramenta desenvolvida para otimizar o registro e a consulta de abordagens policiais. 
             Este manual orienta os <strong>Operadores</strong> sobre como utilizar todas as funcionalidades do sistema, 
             desde o início do serviço até o registro detalhado de ocorrências.
           </p>
@@ -252,15 +252,18 @@ const UserManual: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <p className="text-sm font-bold text-navy-900 uppercase">Galeria de Capas</p>
+              <p className="text-sm font-bold text-navy-900 uppercase">Galeria e Filtros</p>
               <p className="text-xs text-navy-500 leading-relaxed">
-                Visualize rapidamente todos os indivíduos cadastrados através de suas fotos principais. Filtre por cidade para focar na sua área de atuação.
+                Visualize rapidamente todos os indivíduos cadastrados através de suas fotos principais. 
+                Utilize o <strong>Filtro por Facções</strong> (CV, PCC, ADA, TCP) na lista de indivíduos para identificar membros de grupos específicos. 
+                Você também pode filtrar por cidade na Galeria para focar na sua área de atuação.
               </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm font-bold text-navy-900 uppercase">Mapas Operacionais</p>
               <p className="text-xs text-navy-500 leading-relaxed">
-                Veja a mancha criminal e os locais de abordagens no mapa. Útil para identificar pontos de calor e planejar patrulhamento.
+                Veja a mancha criminal e os locais de abordagens no mapa. Os pins indicam locais de abordagens e residências de indivíduos. 
+                No mapa, você pode clicar em um pin para ver detalhes e acessar o link direto para o perfil do indivíduo.
               </p>
             </div>
           </div>
@@ -269,10 +272,10 @@ const UserManual: React.FC = () => {
         {/* Rodapé do Manual */}
         <div className="pt-10 border-t border-navy-50 text-center">
           <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest">
-            SGA5 - SISTEMA DE GESTÃO DE ABORDAGENS • VERSÃO 1.0
+            ARGOS - SISTEMA DE GESTÃO DE ABORDAGENS • VERSÃO 1.0
           </p>
           <p className="text-[8px] text-navy-300 uppercase mt-2">
-            Desenvolvido para uso exclusivo do 5° BPM da Polícia Militar do MS.
+            Desenvolvido para uso exclusivo da Polícia Militar.
           </p>
         </div>
       </div>

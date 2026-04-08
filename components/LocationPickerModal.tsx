@@ -31,7 +31,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({ onClose, onCo
         googleMap.current = new google.maps.Map(mapRef.current, {
           center: defaultPos,
           zoom: 15,
-          mapId: "SGAFT_TACTICAL_MAP",
+          mapId: "ARGOS_TACTICAL_MAP",
           disableDefaultUI: true,
           zoomControl: true,
         });

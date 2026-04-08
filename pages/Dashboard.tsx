@@ -335,7 +335,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <div className="flex items-center space-x-4">
           <TacticalLogo size="md" className="opacity-80" />
           <div>
-            <h4 className="text-navy-900 font-bold uppercase text-xs tracking-widest">SGA5 {latestVersion}</h4>
+            <h4 className="text-navy-900 font-bold uppercase text-xs tracking-widest">ARGOS {latestVersion}</h4>
             <p className="text-navy-400 text-[10px] mt-1 uppercase font-black tracking-[0.2em]">
               CREATED BY SGT JONES • MONITORAMENTO OPERACIONAL ATIVO
             </p>

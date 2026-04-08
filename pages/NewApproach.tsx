@@ -7,8 +7,9 @@ import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, writeBa
 import LocationPickerModal from '../components/LocationPickerModal';
 import TacticalAlert from '../components/TacticalAlert';
 import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
-import { Shift, User, UserRole, Individual, DBApproach } from '../types';
+import { Shift, User, UserRole, Individual, DBApproach, Relationship } from '../types';
 import { loadGoogleMaps } from '../lib/googleMaps';
+import RelationshipSection from '../components/RelationshipSection';
 
 interface PhotoRecordUI {
   id: string;
@@ -73,6 +74,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
   const [isSearching, setIsSearching] = useState(false);
 
   const [photos, setPhotos] = useState<PhotoRecordUI[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [cpfError, setCpfError] = useState(false);
@@ -432,21 +434,11 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           local: approachData.local,
           individuo_id: indId,
           individuo_nome: individualData.nome.toUpperCase(),
-          relatorio: approachData.relatorio || `Abordagem editada via Terminal SGAFT.`,
+          relatorio: approachData.relatorio || `Abordagem editada via Terminal ARGOS.`,
           resultado: approachData.resultado,
           objetos_apreendidos: approachData.objetos_apreendidos,
           updated_at: new Date().toISOString()
         });
-
-        await batch.commit();
-
-        await logAction(
-          user?.id || '',
-          user?.nome || 'Sistema',
-          'APPROACH_EDITED',
-          `Abordagem editada para: ${individualData.nome.toUpperCase()}`,
-          { approachId: id, individualId: indId }
-        );
       } else {
         const appRef = doc(collection(db, 'approaches'));
         batch.set(appRef, {
@@ -455,24 +447,36 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           local: approachData.local,
           individuo_id: indId,
           individuo_nome: individualData.nome.toUpperCase(),
-          relatorio: approachData.relatorio || `Abordagem registrada via Terminal SGAFT. Dados ${selectedIndId ? 'atualizados' : 'cadastrados'} no momento da ação.`,
+          relatorio: approachData.relatorio || `Abordagem registrada via Terminal ARGOS. Dados ${selectedIndId ? 'atualizados' : 'cadastrados'} no momento da ação.`,
           resultado: approachData.resultado,
           objetos_apreendidos: approachData.objetos_apreendidos,
           unidade: user?.unidade || '',
           criado_por: user?.id || '',
           created_at: new Date().toISOString()
         });
-
-        await batch.commit();
-
-        await logAction(
-          user?.id || '',
-          user?.nome || 'Sistema',
-          'APPROACH_REGISTERED',
-          `Abordagem registrada para: ${individualData.nome.toUpperCase()}`,
-          { approachId: appRef.id, individualId: indId }
-        );
       }
+
+      // Salvar relacionamentos
+      relationships.forEach((rel) => {
+        const relRef = doc(collection(db, 'individual_relationships'));
+        batch.set(relRef, {
+          individuo_id: indId,
+          relacionado_id: rel.relacionado_id,
+          tipo: rel.tipo,
+          created_by: user?.nome || 'Sistema',
+          created_at: new Date().toISOString()
+        });
+      });
+
+      await batch.commit();
+
+      await logAction(
+        user?.id || '',
+        user?.nome || 'Sistema',
+        id ? 'APPROACH_EDITED' : 'APPROACH_REGISTERED',
+        `${id ? 'Abordagem editada' : 'Abordagem registrada'} para: ${individualData.nome.toUpperCase()}`,
+        { approachId: id || 'new', individualId: indId }
+      );
 
       alert(id ? 'Registro atualizado com sucesso!' : 'Registro finalizado com sucesso!');
       navigate('/abordagens');
@@ -750,6 +754,14 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
               />
             </div>
           </div>
+        </div>
+
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-navy-100 shadow-xl space-y-6">
+          <RelationshipSection 
+            relationships={relationships}
+            onAdd={(rel) => setRelationships(prev => [...prev, { ...rel, id: Math.random().toString(36).substr(2, 9), created_at: new Date().toISOString() } as Relationship])}
+            onRemove={(id) => setRelationships(prev => prev.filter(r => r.id !== id))}
+          />
         </div>
 
         {/* SEÇÃO INSERIR FOTOS */}

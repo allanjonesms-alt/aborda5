@@ -136,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
             
             <Link to="/" className="flex items-center space-x-2 group">
               <TacticalLogo size="md" className="group-hover:scale-110 transition-transform" />
-              <h1 className="text-xl sm:text-2xl font-black tracking-tighter text-navy-950">SGA5</h1>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tighter text-navy-950">ARGOS</h1>
             </Link>
           </div>
 

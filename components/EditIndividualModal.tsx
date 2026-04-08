@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, a
 import { Individual, User, PhotoRecord, Relationship, Attachment, DBApproach } from '../types';
 import { maskCPF, validateCPF, allowedCities, checkCity, formatAddress } from '../lib/utils';
 import { loadGoogleMaps } from '../lib/googleMaps';
+import RelationshipSection from './RelationshipSection';
 
 interface AttachmentViewerModalProps {
   attachment: Attachment;
@@ -275,6 +276,33 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
     }
   };
 
+  const handleAddRelationship = async (rel: Omit<Relationship, 'id' | 'created_at'>) => {
+    try {
+      await addDoc(collection(db, 'individual_relationships'), {
+        individuo_id: individual.id,
+        relacionado_id: rel.relacionado_id,
+        tipo: rel.tipo,
+        created_by: currentUser?.nome || 'Sistema',
+        created_at: new Date().toISOString()
+      });
+      fetchRelationships();
+    } catch (err) {
+      console.error("Erro ao adicionar relacionamento:", err);
+      handleFirestoreError(err, OperationType.WRITE, 'individual_relationships');
+    }
+  };
+
+  const removeRelationship = async (id: string) => {
+    if (!confirm('Excluir este relacionamento?')) return;
+    try {
+      await deleteDoc(doc(db, 'individual_relationships', id));
+      fetchRelationships();
+    } catch (err) {
+      console.error("Erro ao excluir relacionamento:", err);
+      handleFirestoreError(err, OperationType.DELETE, `individual_relationships/${id}`);
+    }
+  };
+
   const removeAttachment = async (id: string) => {
     if (!confirm('Excluir este anexo permanentemente?')) return;
     try {
@@ -454,6 +482,13 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                     </button>
                   </div>
                 )}
+
+                <RelationshipSection 
+                  relationships={relationships}
+                  onAdd={handleAddRelationship}
+                  onRemove={removeRelationship}
+                  isEditing={isEditing}
+                />
 
                 <div className="space-y-4 pt-4 border-t border-navy-100">
                 <div className="flex items-center justify-between mb-2">

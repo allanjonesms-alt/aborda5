@@ -3,9 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, addDoc, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
-import { User as AppUser, Individual } from '../types';
+import { User as AppUser, Individual, Relationship } from '../types';
 import EditIndividualModal from './EditIndividualModal';
 import { loadGoogleMaps } from '../lib/googleMaps';
+import RelationshipSection from './RelationshipSection';
 
 interface PhotoRecordUI {
   id: string;
@@ -50,6 +51,7 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
   });
   const [photos, setPhotos] = useState<PhotoRecordUI[]>([]);
   const [attachments, setAttachments] = useState<AttachmentUI[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [cpfError, setCpfError] = useState(false);
   
@@ -214,6 +216,17 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
           nome_arquivo: a.nome_arquivo,
           tipo_mime: a.tipo_mime,
           path: a.data,
+          created_by: currentUser?.nome || 'Sistema',
+          created_at: now
+        });
+      });
+
+      relationships.forEach((rel) => {
+        const relRef = doc(collection(db, 'individual_relationships'));
+        batch.set(relRef, {
+          individuo_id: indRef.id,
+          relacionado_id: rel.relacionado_id,
+          tipo: rel.tipo,
           created_by: currentUser?.nome || 'Sistema',
           created_at: now
         });
@@ -433,6 +446,12 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
                 />
               </div>
             </div>
+
+            <RelationshipSection 
+              relationships={relationships}
+              onAdd={(rel) => setRelationships(prev => [...prev, { ...rel, id: Math.random().toString(36).substr(2, 9), created_at: new Date().toISOString() } as Relationship])}
+              onRemove={(id) => setRelationships(prev => prev.filter(r => r.id !== id))}
+            />
 
             <div className="space-y-4 pt-4 border-t border-navy-100">
               <div className="flex items-center justify-between mb-2">

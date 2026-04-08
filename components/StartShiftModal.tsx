@@ -248,10 +248,10 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
                     draggable={!isAssigned}
                     onDragStart={(e) => handleDragStart(e, op.nome.toUpperCase())}
                     className={`p-0 rounded-xl border transition-all flex items-center gap-1.5 cursor-grab active:cursor-grabbing group min-w-0 h-14
-                      ${isAssigned ? 'bg-navy-100 border-navy-200 opacity-30 cursor-not-allowed' : 'bg-navy-900 border-navy-800 hover:border-navy-600 hover:bg-navy-800 shadow-sm'}
+                      ${isAssigned ? 'bg-navy-100 border-navy-200 opacity-30 cursor-not-allowed' : 'bg-forest-600 border-forest-500 hover:border-forest-400 hover:bg-forest-500 shadow-sm'}
                     `}
                   >
-                    <div className={`w-8 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl ${isAssigned ? 'bg-navy-200 text-navy-400' : 'bg-navy-950 text-white'}`}>
+                    <div className={`w-8 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl ${isAssigned ? 'bg-navy-200 text-navy-400' : 'bg-forest-700 text-white'}`}>
                       <i className="fas fa-id-badge text-xs"></i>
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
@@ -273,7 +273,7 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
                     disabled={isAssigned}
                     onClick={() => activeRole && handleDropAssignment(activeRole, op.nome.toUpperCase())}
                     className={`flex items-center justify-between px-6 py-4 rounded-xl border transition-all w-full
-                      ${isAssigned ? 'bg-navy-50 border-navy-100 text-navy-300' : 'bg-white border-navy-200 text-navy-950 active:bg-navy-50 active:border-navy-300'}
+                      ${isAssigned ? 'bg-navy-50 border-navy-100 text-navy-300' : 'bg-forest-50 border-forest-200 text-navy-950 active:bg-forest-100 active:border-forest-300'}
                     `}
                   >
                     <div className="flex flex-col items-start">

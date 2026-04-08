@@ -57,7 +57,7 @@ export interface Relationship {
   id: string;
   individuo_id: string;
   relacionado_id: string;
-  tipo: 'COMPARSA' | 'PARENTE' | 'VIZINHO';
+  tipo: 'COMPARSA' | 'FAMILIAR';
   created_at: string;
   created_by?: string;
   relacionado_nome?: string;

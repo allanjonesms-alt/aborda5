@@ -134,8 +134,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="bg-white border border-navy-100 p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-xl">
           <div className="flex flex-col items-center mb-10">
             <TacticalLogo size="xl" className="mb-6 rotate-3" />
-            <h1 className="text-4xl font-black text-navy-950 tracking-tighter">SGA5</h1>
-            <p className="text-navy-400 mt-2 font-black uppercase text-[10px] tracking-[0.2em] text-center">Sistema de Gerenciamento de Abordagem do 5° BPM</p>
+            <h1 className="text-4xl font-black text-navy-950 tracking-tighter">ARGOS</h1>
+            <p className="text-navy-400 mt-2 font-black uppercase text-[10px] tracking-[0.2em] text-center">Sistema de Gerenciamento de Abordagem</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -216,7 +216,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="mt-12 text-center">
             <p className="text-navy-300 text-[9px] font-black uppercase tracking-[0.4em]">
-              SGA5 V1.0 • CREATED BY ALLAN JONES
+              ARGOS V1.0 • CREATED BY ALLAN JONES
             </p>
           </div>
         </div>
