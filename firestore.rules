@@ -104,10 +104,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isMaster() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'MASTER';
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
-        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'MASTER')) ||
-          (request.auth.token.email == "allanjonesms@gmail.com" && request.auth.token.email_verified == true));
+        (isMaster() ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN') ||
+         (request.auth.token.email == "allanjonesms@gmail.com" && request.auth.token.email_verified == true));
     }
 
     function isOwner(userId) {
@@ -186,24 +194,24 @@ service cloud.firestore {
     }
 
     match /individuals/{individualId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow create: if isAuthenticated() && isValidIndividual(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow update: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidIndividual(request.resource.data) && (isAdmin() || request.resource.data.unidade == resource.data.unidade);
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidIndividual(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidIndividual(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == resource.data.unidade);
+      allow delete: if isAdmin() || isMaster();
     }
 
     match /individual_photos/{photoId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidPhoto(request.resource.data);
       allow update: if isAuthenticated() && isValidPhoto(request.resource.data);
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isMaster();
     }
 
     match /approaches/{approachId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow create: if isAuthenticated() && isValidApproach(request.resource.data) && (isAdmin() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow update: if isAuthenticated() && (isAdmin() || (resource.data.criado_por == request.auth.uid && resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade)) && isValidApproach(request.resource.data) && (isAdmin() || request.resource.data.unidade == resource.data.unidade);
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || isMaster() || (resource.data.criado_por == request.auth.uid && resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade)) && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == resource.data.unidade);
+      allow delete: if isAdmin() || isMaster();
     }
 
     match /vtr_services/{serviceId} {

@@ -106,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const checkShifts = async () => {
       try {
         const shiftsRef = collection(db, 'vtr_services');
-        const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+        const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
         
         let q = query(
           shiftsRef,

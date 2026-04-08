@@ -35,7 +35,7 @@ const MapPage: React.FC<MapPageProps> = ({ user }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+        const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
         
         const approachesRef = collection(db, 'approaches');
         const individualsRef = collection(db, 'individuals');
@@ -223,6 +223,7 @@ const MapPage: React.FC<MapPageProps> = ({ user }) => {
             </div>
             <p style="margin: 0 0 4px 0; font-weight: 700; font-size: 13px; color: #0f172a;">${title.split(': ')[1]}</p>
             ${details ? `<p style="margin: 0; font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase;">${details}</p>` : ''}
+            <a href="/individuos" style="display: block; margin-top: 8px; font-size: 10px; color: #3b82f6; text-decoration: underline;">Ver Perfil</a>
           </div>
         `
       });

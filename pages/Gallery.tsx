@@ -41,7 +41,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
   console.log('Gallery Debug:', { userUnidade: user?.unidade, userCity, matchedCity });
   
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
-  const [activeFilter, setActiveFilter] = useState(isAdmin ? (matchedCity || 'TODOS') : (matchedCity || 'TODOS'));
+  const [activeFilter, setActiveFilter] = useState(isAdmin ? 'TODOS' : (matchedCity || 'TODOS'));
   
   // Force filter for non-admins
   useEffect(() => {
@@ -76,7 +76,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
 
     try {
       const individualsRef = collection(db, 'individuals');
-      const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
       
       let q = query(
         individualsRef,

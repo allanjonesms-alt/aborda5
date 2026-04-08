@@ -217,7 +217,7 @@ const ApproachesList: React.FC<ApproachesListProps> = ({ user }) => {
 
     try {
       const approachesRef = collection(db, 'approaches');
-      const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
       
       let q = query(approachesRef, orderBy('data', 'desc'), limit(ITEMS_PER_PAGE));
 

@@ -86,6 +86,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [factionFilter, setFactionFilter] = useState('');
   const [editingIndividual, setEditingIndividual] = useState<Individual | null>(null);
   const [managingPhotosIndividual, setManagingPhotosIndividual] = useState<Individual | null>(null);
   const [isAddingIndividual, setIsAddingIndividual] = useState(false);
@@ -105,19 +106,19 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
     if (isLoadingMore || isLoading) return;
     if (observerRef.current) observerRef.current.disconnect();
     observerRef.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) fetchIndividuals(false, debouncedSearch);
+      if (entries[0].isIntersecting && hasMore) fetchIndividuals(false, debouncedSearch, factionFilter);
     }, { threshold: 0.1 });
     if (node) observerRef.current.observe(node);
-  }, [isLoadingMore, isLoading, hasMore, debouncedSearch]);
+  }, [isLoadingMore, isLoading, hasMore, debouncedSearch, factionFilter]);
 
-  const fetchIndividuals = useCallback(async (isInitial: boolean = false, searchTerm: string = '') => {
+  const fetchIndividuals = useCallback(async (isInitial: boolean = false, searchTerm: string = '', faction: string = '') => {
     // Só busca se o usuário estiver carregado
     if (!user) {
       console.log('Aguardando carregamento do usuário...');
       return;
     }
 
-    console.log('Fetching individuals:', { isInitial, searchTerm, lastDoc });
+    console.log('Fetching individuals:', { isInitial, searchTerm, faction, lastDoc });
     if (isInitial) {
       setIsLoading(true);
       setLastDoc(null);
@@ -131,29 +132,31 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       let q;
 
       // Filtro de unidade
-      const unitFilter = (user?.role !== 'ADMIN' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const factionFilterClause = faction ? where('faccao', '==', faction) : null;
 
       if (isInitial) {
-        const countSnapshot = unitFilter 
-          ? await getCountFromServer(query(individualsRef, unitFilter))
-          : await getCountFromServer(individualsRef);
+        let countQuery = query(individualsRef);
+        if (unitFilter) countQuery = query(countQuery, unitFilter);
+        if (factionFilterClause) countQuery = query(countQuery, factionFilterClause);
+        
+        const countSnapshot = await getCountFromServer(countQuery);
         setTotalCount(countSnapshot.data().count);
       }
 
+      const queryConstraints = [];
+      if (unitFilter) queryConstraints.push(unitFilter);
+      if (factionFilterClause) queryConstraints.push(factionFilterClause);
+      
       if (searchTerm.trim()) {
         const s = searchTerm.trim().toUpperCase();
-        const baseQuery = unitFilter 
-          ? query(individualsRef, unitFilter, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'))
-          : query(individualsRef, where('nome', '>=', s), where('nome', '<=', s + '\uf8ff'), orderBy('nome'));
-        
-        q = query(baseQuery, limit(ITEMS_PER_PAGE));
-      } else {
-        const baseQuery = unitFilter 
-          ? query(individualsRef, unitFilter, orderBy('nome'))
-          : query(individualsRef, orderBy('nome'));
-          
-        q = query(baseQuery, limit(ITEMS_PER_PAGE));
+        queryConstraints.push(where('nome', '>=', s));
+        queryConstraints.push(where('nome', '<=', s + '\uf8ff'));
       }
+      
+      queryConstraints.push(orderBy('nome'));
+      
+      q = query(individualsRef, ...queryConstraints, limit(ITEMS_PER_PAGE));
 
       if (!isInitial && lastDoc) {
         q = query(q, startAfter(lastDoc));
@@ -172,7 +175,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         const photosSnapshot = await getDocs(photosQ);
         
         const photos = photosSnapshot.docs.map(pDoc => ({ id: pDoc.id, ...pDoc.data() } as PhotoRecord));
-
+        
         newIndividuals.push({
           id: docSnapshot.id,
           ...data,
@@ -218,8 +221,8 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   }, [lastDoc, user]);
 
   useEffect(() => {
-    fetchIndividuals(true, debouncedSearch);
-  }, [debouncedSearch]);
+    fetchIndividuals(true, debouncedSearch, factionFilter);
+  }, [debouncedSearch, factionFilter]);
 
   const handleSave = () => {
     setIndividuals([]);
@@ -252,6 +255,17 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
             />
             <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-navy-300"></i>
           </div>
+          <select 
+            value={factionFilter}
+            onChange={(e) => setFactionFilter(e.target.value)}
+            className="bg-white border border-navy-200 text-navy-950 px-4 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-navy-500 transition-all font-bold text-sm shadow-sm"
+          >
+            <option value="">Todas as Facções</option>
+            <option value="CV">CV</option>
+            <option value="PCC">PCC</option>
+            <option value="ADA">ADA</option>
+            <option value="TCP">TCP</option>
+          </select>
           <button 
             onClick={() => setIsAddingIndividual(true)} 
             className="bg-navy-600 hover:bg-navy-500 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3"
