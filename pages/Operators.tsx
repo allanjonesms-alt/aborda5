@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Siren } from 'lucide-react';
 import { User, UserRole, Unit } from '../types';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
+import TacticalAlert from '../components/TacticalAlert';
 import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, writeBatch, deleteDoc, onSnapshot } from 'firebase/firestore';
 import AddUserModal from '../components/AddUserModal';
 
@@ -15,9 +16,11 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
   
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const isMaster = user?.role === UserRole.MASTER;
   const [units, setUnits] = useState<Unit[]>([]);
@@ -26,6 +29,11 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
     const q = query(collection(db, 'units'), orderBy('nome', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+      // Ensure FORÇA TÁTICA is always available in the list
+      if (!data.some(u => u.nome === 'FORÇA TÁTICA')) {
+        data.push({ id: 'ft-default', nome: 'FORÇA TÁTICA' } as Unit);
+        data.sort((a, b) => a.nome.localeCompare(b.nome));
+      }
       setUnits(data);
     });
     return () => unsubscribe();
@@ -106,10 +114,10 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
       );
       
       setHasChanges(false);
-      alert('Ordenação salva com sucesso!');
+      setAlertMessage('Ordenação salva com sucesso!');
     } catch (err: any) {
       handleFirestoreError(err, OperationType.WRITE, 'users/reorder');
-      alert('Erro ao salvar ordenação: ' + err.message);
+      setAlertMessage('Erro ao salvar ordenação: ' + err.message);
     } finally {
       setIsSavingOrder(false);
     }
@@ -125,11 +133,12 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
     );
   }
 
-  const handleDeleteUser = async (targetUser: User) => {
-    if (!isMaster) return;
-    if (!confirm(`TEM CERTEZA QUE DESEJA EXCLUIR O OPERADOR ${targetUser.nome}?\nEsta ação é irreversível e removerá todos os dados de acesso deste usuário.`)) return;
+  const handleDeleteUser = async () => {
+    if (!isMaster || !userToDelete) return;
+    setIsSaving(true);
 
     try {
+      const targetUser = userToDelete;
       const userRef = doc(db, 'users', targetUser.id);
       await deleteDoc(userRef);
 
@@ -141,39 +150,42 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
         { targetUserId: targetUser.id }
       );
 
-      alert('Operador excluído com sucesso!');
+      setUserToDelete(null);
       fetchUsers();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `users/${targetUser.id}`);
-      alert('Erro ao excluir: ' + err.message);
+      handleFirestoreError(err, OperationType.DELETE, `users/${userToDelete.id}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleResetPassword = async (targetUser: User) => {
     if (!isMaster) return;
-    const defaultPassword = 'Mudar@123';
-    if (!confirm(`Deseja resetar a senha de ${targetUser.nome}?\nA nova senha será: ${defaultPassword}\nO usuário será obrigado a trocá-la no próximo acesso.`)) return;
-
+    const defaultPassword = '@Senha123';
+    
     try {
       const userRef = doc(db, 'users', targetUser.id);
       await updateDoc(userRef, { 
         senha: defaultPassword, 
-        primeiro_acesso: false 
+        primeiro_acesso: true 
       });
 
       await logAction(
         user?.id || '',
         user?.nome || 'Sistema',
         'USER_PASSWORD_RESET',
-        `Senha do operador ${targetUser.nome} (MAT: ${targetUser.matricula}) resetada pelo administrador.`,
+        `Senha do operador ${targetUser.nome} (MAT: ${targetUser.matricula}) resetada para o padrão pelo administrador.`,
         { targetUserId: targetUser.id }
       );
 
-      alert('Senha resetada com sucesso!');
+      if (editingUser?.id === targetUser.id) {
+        setEditingUser({ ...editingUser, senha: defaultPassword, primeiro_acesso: true });
+      }
+      
+      setAlertMessage('Senha resetada para @Senha123 com sucesso!');
       fetchUsers();
     } catch (err: any) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${targetUser.id}`);
-      alert('Erro ao resetar: ' + err.message);
     }
   };
 
@@ -189,7 +201,8 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
         matricula: editingUser.matricula,
         role: editingUser.role,
         ord: editingUser.ord,
-        unidade: editingUser.unidade || ''
+        unidade: editingUser.unidade || '',
+        unidades_extras: editingUser.unidades_extras || []
       });
 
       await logAction(
@@ -204,7 +217,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
       fetchUsers();
     } catch (err: any) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${editingUser.id}`);
-      alert('Erro ao atualizar: ' + err.message);
+      setAlertMessage('Erro ao atualizar: ' + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -225,6 +238,12 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
 
   return (
     <div className="max-w-6xl mx-auto py-6 space-y-10">
+      {alertMessage && (
+        <TacticalAlert 
+          message={alertMessage} 
+          onClose={() => setAlertMessage(null)} 
+        />
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4">
         <div className="flex items-center space-x-4">
           <div className="bg-navy-600 p-3 rounded-2xl shadow-xl">
@@ -273,70 +292,67 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {users.map((u, idx) => (
-                <div key={u.id} className="bg-white border border-navy-100 rounded-3xl p-6 shadow-lg relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-4 flex items-center gap-2">
+                <div key={u.id} className="bg-white border border-navy-100 rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                  <div className="absolute top-0 right-0 p-3">
                     {isMaster && (
-                      <div className="flex flex-col gap-1 mr-2">
+                      <div className="flex flex-col gap-0.5">
                         <button 
                           onClick={() => handleMove(idx, 'up', unit)}
                           disabled={idx === 0}
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === 0 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
+                          className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${idx === 0 ? 'bg-gray-50 text-gray-200' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
                         >
-                          <i className="fas fa-chevron-up text-[10px]"></i>
+                          <i className="fas fa-chevron-up text-[8px]"></i>
                         </button>
                         <button 
                           onClick={() => handleMove(idx, 'down', unit)}
                           disabled={idx === users.length - 1}
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${idx === users.length - 1 ? 'bg-gray-50 text-gray-300' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
+                          className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${idx === users.length - 1 ? 'bg-gray-50 text-gray-200' : 'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}
                         >
-                          <i className="fas fa-chevron-down text-[10px]"></i>
+                          <i className="fas fa-chevron-down text-[8px]"></i>
                         </button>
                       </div>
                     )}
-                    <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${u.role === UserRole.ADMIN ? 'bg-red-50 text-red-600 border border-red-100' : u.role === UserRole.MASTER ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-gray-100 text-navy-600 border border-navy-100'}`}>
-                      {u.role}
-                    </span>
                   </div>
-
-                  <div className="flex items-center space-x-4 mb-6">
-                    <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-navy-100 group-hover:border-forest-600/50 transition-colors">
-                      <i className={`fas ${u.role === UserRole.ADMIN ? 'fa-user-shield' : u.role === UserRole.MASTER ? 'fa-crown' : 'fa-user'} text-navy-400 text-xl`}></i>
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center border transition-all ${
+                      u.role === UserRole.MASTER ? 'bg-purple-50 border-purple-100 text-purple-600' :
+                      u.role === UserRole.ADMIN ? 'bg-red-50 border-red-100 text-red-600' :
+                      'bg-navy-50 border-navy-100 text-navy-600'
+                    }`}>
+                      <i className={`fas ${u.role === UserRole.ADMIN ? 'fa-user-shield' : u.role === UserRole.MASTER ? 'fa-crown' : 'fa-user'} text-lg`}></i>
                     </div>
                     <div className="overflow-hidden">
-                      <h4 className="text-navy-950 font-black uppercase text-sm truncate">{u.nome}</h4>
-                      <p className="text-navy-400 text-[10px] font-bold">MAT: {u.matricula} • ORD: {u.ord || 0}</p>
+                      <h4 className="text-navy-950 font-black uppercase text-xs truncate">{u.nome}</h4>
+                      <p className="text-navy-400 text-[8px] font-bold">MAT: {u.matricula} • ORD: {u.ord || 0}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className={`w-2 h-2 rounded-full ${u.primeiro_acesso ? 'bg-forest-600' : 'bg-yellow-500'}`}></div>
-                    <span className="text-[9px] font-black uppercase text-navy-400 tracking-widest">
-                      {u.primeiro_acesso ? 'Acesso Liberado' : 'Senha Pendente'}
-                    </span>
-                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${!u.primeiro_acesso ? 'bg-forest-600' : 'bg-yellow-500'}`}></div>
+                      <span className="text-[8px] font-black uppercase text-navy-400 tracking-widest">
+                        {!u.primeiro_acesso ? 'Acesso Liberado' : 'Senha Pendente'}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-3">
                     {isMaster && (
-                      <>
+                      <div className="flex gap-1">
                         <button 
                           onClick={() => setEditingUser(u)}
-                          className="bg-gray-50 hover:bg-gray-100 text-navy-900 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100"
+                          className="w-8 h-8 bg-navy-50 hover:bg-navy-100 text-navy-600 rounded-lg flex items-center justify-center transition-all border border-navy-100"
+                          title="Editar"
                         >
-                          <i className="fas fa-pencil-alt text-forest-600"></i> Editar
+                          <i className="fas fa-pencil-alt text-[10px]"></i>
                         </button>
                         <button 
-                          onClick={() => handleDeleteUser(u)}
-                          className="bg-gray-50 hover:bg-red-50 text-navy-400 hover:text-red-500 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 border border-navy-100 hover:border-red-100"
+                          onClick={() => setUserToDelete(u)}
+                          className="w-8 h-8 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg flex items-center justify-center transition-all border border-red-100"
+                          title="Excluir"
                         >
-                          <i className="fas fa-trash-alt"></i> Excluir
+                          <i className="fas fa-trash-alt text-[10px]"></i>
                         </button>
-                      </>
-                    )}
-                    {!isMaster && (
-                      <div className="col-span-2 py-3 text-center">
-                        <span className="text-[8px] font-black uppercase text-navy-300 tracking-widest">Acesso de Leitura</span>
                       </div>
                     )}
                   </div>
@@ -357,24 +373,24 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
 
       {editingUser && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md">
-          <div className="bg-white border border-navy-100 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+          <div className="bg-white border border-navy-100 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
             <div className="bg-navy-600 p-4 border-b border-navy-500 flex justify-between items-center">
               <h3 className="text-white font-black uppercase tracking-tighter">Editar Operador</h3>
               <button onClick={() => setEditingUser(null)} className="text-navy-400 hover:text-white"><i className="fas fa-times text-xl"></i></button>
             </div>
             
-            <form onSubmit={handleUpdateUser} className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Nome Completo</label>
-                <input 
-                  type="text" 
-                  value={editingUser.nome} 
-                  onChange={e => setEditingUser({...editingUser, nome: e.target.value})}
-                  className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none"
-                />
-              </div>
+            <form onSubmit={handleUpdateUser} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Nome Completo</label>
+                  <input 
+                    type="text" 
+                    value={editingUser.nome} 
+                    onChange={e => setEditingUser({...editingUser, nome: e.target.value})}
+                    className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none"
+                  />
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Matrícula</label>
                   <input 
@@ -393,33 +409,71 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                     className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Unidade Principal</label>
+                  <select 
+                    value={editingUser.unidade || ''} 
+                    onChange={e => setEditingUser({...editingUser, unidade: e.target.value})}
+                    className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
+                  >
+                    <option value="">Selecione a Unidade</option>
+                    {units.map(unit => (
+                      <option key={unit.id} value={unit.nome}>{unit.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Cargo / Perfil</label>
+                  <select 
+                    value={editingUser.role} 
+                    onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
+                    className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
+                  >
+                    <option value={UserRole.ADMIN}>ADMINISTRADOR</option>
+                    <option value={UserRole.OPERATOR}>OPERADOR</option>
+                    <option value={UserRole.MASTER}>MASTER</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Unidade</label>
-                <select 
-                  value={editingUser.unidade || ''} 
-                  onChange={e => setEditingUser({...editingUser, unidade: e.target.value})}
-                  className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
-                >
-                  <option value="">Selecione a Unidade</option>
-                  {units.map(unit => (
-                    <option key={unit.id} value={unit.nome}>{unit.nome}</option>
-                  ))}
-                </select>
-              </div>
+              {(editingUser.role === UserRole.ADMIN || editingUser.role === UserRole.MASTER) && (
+                <div className="bg-navy-50 p-4 rounded-2xl border border-navy-100">
+                  <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-3">Unidades Adicionais de Atuação</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {units.filter(u => u.nome !== editingUser.unidade).map(unit => {
+                      const isSelected = editingUser.unidades_extras?.includes(unit.nome);
+                      return (
+                        <button
+                          key={unit.id}
+                          type="button"
+                          onClick={() => {
+                            const extras = editingUser.unidades_extras || [];
+                            const newExtras = isSelected 
+                              ? extras.filter(e => e !== unit.nome)
+                              : [...extras, unit.nome];
+                            setEditingUser({ ...editingUser, unidades_extras: newExtras });
+                          }}
+                          className={`px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all border ${isSelected ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-navy-400 border-navy-100 hover:border-navy-300'}`}
+                        >
+                          {unit.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Cargo / Perfil</label>
-                <select 
-                  value={editingUser.role} 
-                  onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
-                  className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
+              <div className="pt-4 border-t border-navy-100">
+                <button 
+                  type="button"
+                  onClick={() => handleResetPassword(editingUser)}
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-black py-3 rounded-xl uppercase text-[10px] border border-red-100 transition-all flex items-center justify-center gap-2"
                 >
-                  <option value={UserRole.ADMIN}>ADMINISTRADOR</option>
-                  <option value={UserRole.OPERATOR}>OPERADOR</option>
-                  <option value={UserRole.MASTER}>MASTER</option>
-                </select>
+                  <i className="fas fa-key"></i> Resetar Senha para @Senha123
+                </button>
+                <p className="text-[8px] text-navy-400 font-bold text-center mt-2 uppercase tracking-widest">O usuário deverá cadastrar nova senha no próximo acesso.</p>
               </div>
 
               <div className="flex gap-4 pt-2">
@@ -440,6 +494,44 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {userToDelete && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md">
+          <div className="bg-white border-2 border-red-600 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-red-600 p-6 flex items-center gap-4">
+              <i className="fas fa-exclamation-triangle text-white text-3xl animate-pulse"></i>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirmar Exclusão</h3>
+                <p className="text-red-100 text-[10px] font-bold uppercase tracking-widest">Esta ação é irreversível</p>
+              </div>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <p className="text-navy-950 text-sm font-medium leading-relaxed">
+                Tem certeza que deseja excluir permanentemente o operador <span className="text-red-600 font-black">{userToDelete.nome}</span>? 
+                Todos os dados de acesso e histórico deste usuário serão removidos.
+              </p>
+
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => setUserToDelete(null)}
+                  disabled={isSaving}
+                  className="flex-1 bg-navy-50 text-navy-900 font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest transition-all hover:bg-navy-100 border border-navy-100"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDeleteUser}
+                  disabled={isSaving}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-red-600/20 transition-all"
+                >
+                  {isSaving ? <i className="fas fa-spinner fa-spin"></i> : 'Confirmar Exclusão'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

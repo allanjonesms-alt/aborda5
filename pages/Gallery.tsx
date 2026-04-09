@@ -4,7 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
 import { Individual, User, UserRole } from '../types';
 import EditIndividualModal from '../components/EditIndividualModal';
-import { allowedCities, RIO_VERDE_VARIATIONS } from '../lib/utils';
+import { allowedCities, RIO_VERDE_VARIATIONS, checkIsAdmin } from '../lib/utils';
 
 const ITEMS_PER_PAGE = 18;
 
@@ -40,7 +40,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
 
   console.log('Gallery Debug:', { userUnidade: user?.unidade, userCity, matchedCity });
   
-  const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
+  const isAdmin = checkIsAdmin(user);
   const [activeFilter, setActiveFilter] = useState(isAdmin ? 'TODOS' : (matchedCity || 'TODOS'));
   
   // Force filter for non-admins
@@ -76,7 +76,8 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
 
     try {
       const individualsRef = collection(db, 'individuals');
-      const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const isAdmin = checkIsAdmin(user);
+      const unitFilter = (!isAdmin && user?.unidade) ? where('unidade', '==', user.unidade) : null;
       
       let q = query(
         individualsRef,

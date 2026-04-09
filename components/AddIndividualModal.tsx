@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, addDoc, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity, getCityFromAddressComponents } from '../lib/utils';
 import { User as AppUser, Individual, Relationship } from '../types';
 import EditIndividualModal from './EditIndividualModal';
 import { loadGoogleMaps } from '../lib/googleMaps';
@@ -46,6 +46,7 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
     documento: '',
     mae: '',
     endereco: '',
+    cidade: '',
     faccao: '',
     observacao: ''
   });
@@ -107,7 +108,7 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
           return;
         }
 
-        setFormData(prev => ({ ...prev, endereco: place.formatted_address }));
+        setFormData(prev => ({ ...prev, endereco: place.formatted_address, cidade: getCityFromAddressComponents(place.address_components || []) }));
       });
     } catch (err) {
       console.error("Erro ao inicializar Autocomplete:", err);

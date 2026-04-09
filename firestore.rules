@@ -118,6 +118,14 @@ service cloud.firestore {
          (request.auth.token.email == "allanjonesms@gmail.com" && request.auth.token.email_verified == true));
     }
 
+    function isForcaTatica() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade == 'FORÇA TÁTICA' ||
+         ('unidades_extras' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data && 
+          'FORÇA TÁTICA' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidades_extras));
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -135,7 +143,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['matricula', 'nome', 'senha', 'role', 'primeiro_acesso', 'ord', 'created_at', 'unidade']) &&
+      return hasOnlyAllowedFields(['matricula', 'nome', 'senha', 'role', 'primeiro_acesso', 'ord', 'created_at', 'unidade', 'unidades_extras']) &&
              data.matricula is string && data.matricula.size() > 0 &&
              data.nome is string && data.nome.size() > 0 &&
              data.senha is string && data.senha.size() >= 5 &&
@@ -143,7 +151,8 @@ service cloud.firestore {
              (data.primeiro_acesso is bool) &&
              (data.ord is int) &&
              (data.created_at is timestamp) &&
-             (!('unidade' in data) || data.unidade is string);
+             (!('unidade' in data) || data.unidade is string) &&
+             (!('unidades_extras' in data) || data.unidades_extras is list);
     }
 
     function isValidUnit(data) {
@@ -153,9 +162,10 @@ service cloud.firestore {
     }
 
     function isValidIndividual(data) {
-      return hasOnlyAllowedFields(['nome', 'alcunha', 'documento', 'data_nascimento', 'mae', 'endereco', 'faccao', 'observacao', 'unidade', 'created_at', 'updated_at']) &&
+      return hasOnlyAllowedFields(['nome', 'alcunha', 'documento', 'data_nascimento', 'mae', 'endereco', 'faccao', 'observacao', 'unidade', 'cidade', 'created_at', 'updated_at', 'criado_por']) &&
              data.nome is string && data.nome.size() > 0 && data.nome.size() < 200 &&
-             (!('unidade' in data) || data.unidade is string);
+             (!('unidade' in data) || data.unidade is string) &&
+             (!('cidade' in data) || data.cidade is string);
     }
 
     function isValidPhoto(data) {
@@ -205,9 +215,9 @@ service cloud.firestore {
     }
 
     match /individuals/{individualId} {
-      allow read: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow create: if isAuthenticated() && isValidIndividual(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow update: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidIndividual(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == resource.data.unidade);
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || isForcaTatica() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidIndividual(request.resource.data) && (isAdmin() || isMaster() || isForcaTatica() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || isMaster() || isForcaTatica() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade) && isValidIndividual(request.resource.data) && (isAdmin() || isMaster() || isForcaTatica() || request.resource.data.unidade == resource.data.unidade);
       allow delete: if isAdmin() || isMaster();
     }
 
@@ -233,9 +243,9 @@ service cloud.firestore {
     }
 
     match /approaches/{approachId} {
-      allow read: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow create: if isAuthenticated() && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
-      allow update: if isAuthenticated() && (isAdmin() || isMaster() || (resource.data.criado_por == request.auth.uid && resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade)) && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || request.resource.data.unidade == resource.data.unidade);
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || isForcaTatica() || resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow create: if isAuthenticated() && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || isForcaTatica() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
+      allow update: if isAuthenticated() && (isAdmin() || isMaster() || isForcaTatica() || (resource.data.criado_por == request.auth.uid && resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade)) && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || isForcaTatica() || request.resource.data.unidade == resource.data.unidade);
       allow delete: if isAdmin() || isMaster();
     }
 

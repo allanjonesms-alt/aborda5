@@ -17,6 +17,8 @@ const ManageUnitsModal: React.FC<ManageUnitsModalProps> = ({ onClose, user }) =>
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedUnitForFeatures, setSelectedUnitForFeatures] = useState<Unit | null>(null);
+  const [unitToDelete, setUnitToDelete] = useState<Unit | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -64,21 +66,43 @@ const ManageUnitsModal: React.FC<ManageUnitsModalProps> = ({ onClose, user }) =>
     }
   };
 
-  const handleDeleteUnit = async (unit: Unit) => {
-    if (!confirm(`Deseja realmente excluir a unidade "${unit.nome}"?`)) return;
+  const handleDeleteUnit = async () => {
+    if (!unitToDelete) return;
 
+    setIsSaving(true);
     try {
-      await deleteDoc(doc(db, 'units', unit.id));
+      await deleteDoc(doc(db, 'units', unitToDelete.id));
       
       await logAction(
         user?.id || '',
         user?.nome || 'Sistema',
         'UNIT_DELETED',
-        `Unidade excluída: ${unit.nome}`,
-        { unitId: unit.id, unitName: unit.nome }
+        `Unidade excluída: ${unitToDelete.nome}`,
+        { unitId: unitToDelete.id, unitName: unitToDelete.nome }
       );
+      setUnitToDelete(null);
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `units/${unit.id}`);
+      handleFirestoreError(err, OperationType.DELETE, `units/${unitToDelete.id}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSeedUnits = async () => {
+    setIsSeeding(true);
+    const defaultUnits = ['5° BPM', '5°BPM-Sede', '2ª CIA - Rio Verde', '3° Pelotão - Alcinópolis', '2° Pelotão - Pedro Gomes', 'FORÇA TÁTICA'];
+    try {
+      const batch = writeBatch(db);
+      defaultUnits.forEach(nome => {
+        const unitRef = doc(collection(db, 'units'));
+        batch.set(unitRef, { nome, created_at: serverTimestamp() });
+      });
+      await batch.commit();
+      await logAction(user?.id || '', user?.nome || 'Sistema', 'UNIT_SEED', 'Importação inicial de unidades realizada.');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'units');
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -136,26 +160,11 @@ const ManageUnitsModal: React.FC<ManageUnitsModalProps> = ({ onClose, user }) =>
               <div className="py-10 text-center bg-navy-50 rounded-2xl border border-dashed border-navy-200 space-y-4">
                 <p className="text-navy-400 font-bold text-xs">Nenhuma unidade cadastrada.</p>
                 <button 
-                  onClick={async () => {
-                    setIsSaving(true);
-                    const defaultUnits = ['5° BPM', '5°BPM-Sede', '2ª CIA - Rio Verde', '3° Pelotão - Alcinópolis', '2° Pelotão - Pedro Gomes'];
-                    try {
-                      const batch = writeBatch(db);
-                      defaultUnits.forEach(nome => {
-                        const unitRef = doc(collection(db, 'units'));
-                        batch.set(unitRef, { nome, created_at: serverTimestamp() });
-                      });
-                      await batch.commit();
-                      await logAction(user?.id || '', user?.nome || 'Sistema', 'UNIT_SEED', 'Importação inicial de unidades realizada.');
-                    } catch (err) {
-                      handleFirestoreError(err, OperationType.CREATE, 'units');
-                    } finally {
-                      setIsSaving(false);
-                    }
-                  }}
+                  onClick={handleSeedUnits}
+                  disabled={isSeeding}
                   className="bg-navy-600 hover:bg-navy-500 text-white px-4 py-2 rounded-xl font-black uppercase text-[8px] tracking-widest shadow-lg transition-all"
                 >
-                  Importar Unidades Padrão
+                  {isSeeding ? <i className="fas fa-spinner fa-spin mr-2"></i> : 'Importar Unidades Padrão'}
                 </button>
               </div>
             ) : (
@@ -177,7 +186,7 @@ const ManageUnitsModal: React.FC<ManageUnitsModalProps> = ({ onClose, user }) =>
                       <i className="fas fa-gears"></i>
                     </button>
                     <button 
-                      onClick={() => handleDeleteUnit(unit)}
+                      onClick={() => setUnitToDelete(unit)}
                       className="text-navy-300 hover:text-red-500 transition-colors p-2"
                       title="Excluir Unidade"
                     >
@@ -206,6 +215,44 @@ const ManageUnitsModal: React.FC<ManageUnitsModalProps> = ({ onClose, user }) =>
           onClose={() => setSelectedUnitForFeatures(null)} 
           user={user}
         />
+      )}
+
+      {unitToDelete && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md">
+          <div className="bg-white border-2 border-red-600 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-red-600 p-6 flex items-center gap-4">
+              <i className="fas fa-exclamation-triangle text-white text-3xl animate-pulse"></i>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirmar Exclusão</h3>
+                <p className="text-red-100 text-[10px] font-bold uppercase tracking-widest">Unidade: {unitToDelete.nome}</p>
+              </div>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <p className="text-navy-950 text-sm font-medium leading-relaxed">
+                Tem certeza que deseja excluir a unidade <span className="text-red-600 font-black">{unitToDelete.nome}</span>? 
+                Esta ação pode afetar o acesso de operadores vinculados a esta unidade.
+              </p>
+
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => setUnitToDelete(null)}
+                  disabled={isSaving}
+                  className="flex-1 bg-navy-50 text-navy-900 font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest transition-all hover:bg-navy-100 border border-navy-100"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDeleteUnit}
+                  disabled={isSaving}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-red-600/20 transition-all"
+                >
+                  {isSaving ? <i className="fas fa-spinner fa-spin"></i> : 'Confirmar Exclusão'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

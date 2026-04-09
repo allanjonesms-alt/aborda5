@@ -77,6 +77,14 @@
           "type": "string",
           "description": "General observations"
         },
+        "unidade": {
+          "type": "string",
+          "description": "Police unit"
+        },
+        "cidade": {
+          "type": "string",
+          "description": "City of the individual"
+        },
         "created_at": {
           "type": "string",
           "format": "date-time",
@@ -86,6 +94,10 @@
           "type": "string",
           "format": "date-time",
           "description": "Last update timestamp"
+        },
+        "criado_por": {
+          "type": "string",
+          "description": "Operator who registered the individual"
         }
       },
       "required": ["nome"]

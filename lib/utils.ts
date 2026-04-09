@@ -1,4 +1,6 @@
 
+import { User, UserRole } from '../types';
+
 export const maskCPF = (value: string) => {
   return value
     .replace(/\D/g, '')
@@ -57,6 +59,22 @@ export const checkCity = (addressComponents: any[]) => {
   return allowedCities.some(city => cityName.includes(city));
 };
 
+export const getCityFromAddressComponents = (addressComponents: any[]) => {
+  const cityComponent = addressComponents.find(c => 
+    c.types.includes('locality') || 
+    c.types.includes('administrative_area_level_2')
+  );
+  
+  if (!cityComponent) return '';
+  
+  const cityName = cityComponent.long_name.toUpperCase();
+  
+  if (RIO_VERDE_VARIATIONS.some(v => cityName.includes(v))) return '2ª CIA/RIO VERDE';
+  
+  const matchedCity = allowedCities.find(city => cityName.includes(city));
+  return matchedCity || '';
+};
+
 export const formatAddress = (address: string) => {
   const parts = (address || '')
     .replace(/BRASIL/gi, '')
@@ -69,4 +87,14 @@ export const formatAddress = (address: string) => {
   const street = parts.join(', ');
   
   return { street, city };
+};
+
+export const checkIsAdmin = (user: User | null) => {
+  if (!user) return false;
+  return (
+    user.role === UserRole.ADMIN || 
+    user.role === UserRole.MASTER || 
+    user.unidade === 'FORÇA TÁTICA' ||
+    (user.unidades_extras && user.unidades_extras.includes('FORÇA TÁTICA'))
+  );
 };

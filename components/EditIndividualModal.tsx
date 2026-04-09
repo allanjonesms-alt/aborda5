@@ -3,9 +3,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, orderBy } from 'firebase/firestore';
 import { Individual, User, PhotoRecord, Relationship, Attachment, DBApproach } from '../types';
-import { maskCPF, validateCPF, allowedCities, checkCity, formatAddress } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity, formatAddress, getCityFromAddressComponents } from '../lib/utils';
 import { loadGoogleMaps } from '../lib/googleMaps';
 import RelationshipSection from './RelationshipSection';
+import ManagePhotosModal from './ManagePhotosModal';
 
 interface AttachmentViewerModalProps {
   attachment: Attachment;
@@ -81,6 +82,9 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [approachesHistory, setApproachesHistory] = useState<DBApproach[]>([]);
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
+  const [isManagingPhotos, setIsManagingPhotos] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'RELATIONSHIP' | 'ATTACHMENT' } | null>(null);
+  const [promptData, setPromptData] = useState<{ title: string, placeholder: string, value: string, onConfirm: (val: string) => void } | null>(null);
   const [cpfError, setCpfError] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
@@ -129,7 +133,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
           return;
         }
 
-        setFormData(prev => ({ ...prev, endereco: place.formatted_address }));
+        setFormData(prev => ({ ...prev, endereco: place.formatted_address, cidade: getCityFromAddressComponents(place.address_components || []) }));
       });
     } catch (err) {
       console.error("Erro no Autocomplete:", err);
@@ -229,51 +233,55 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      const legenda = window.prompt(`Informe uma LEGENDA para o arquivo: ${file.name}`);
       
-      if (legenda === null) {
-        if (attachmentInputRef.current) attachmentInputRef.current.value = '';
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        try {
-          await addDoc(collection(db, 'individual_attachments'), {
-            individuo_id: individual.id,
-            nome_arquivo: file.name,
-            tipo_mime: file.type,
-            path: base64String,
-            legenda: legenda || '',
-            created_by: currentUser?.nome || 'Sistema',
-            created_at: new Date().toISOString()
-          });
-          fetchAttachments();
-        } catch (err) {
-          console.error("Erro ao adicionar anexo:", err);
-          handleFirestoreError(err, OperationType.WRITE, 'individual_attachments');
+      setPromptData({
+        title: `Informe uma LEGENDA para o arquivo: ${file.name}`,
+        placeholder: 'Legenda do documento...',
+        value: '',
+        onConfirm: (legenda) => {
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const base64String = reader.result as string;
+            try {
+              await addDoc(collection(db, 'individual_attachments'), {
+                individuo_id: individual.id,
+                nome_arquivo: file.name,
+                tipo_mime: file.type,
+                path: base64String,
+                legenda: legenda || '',
+                created_by: currentUser?.nome || 'Sistema',
+                created_at: new Date().toISOString()
+              });
+              fetchAttachments();
+            } catch (err) {
+              console.error("Erro ao adicionar anexo:", err);
+              handleFirestoreError(err, OperationType.WRITE, 'individual_attachments');
+            }
+          };
+          reader.readAsDataURL(file);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
     if (attachmentInputRef.current) attachmentInputRef.current.value = '';
   };
 
   const handleEditLegenda = async (attachment: Attachment) => {
-    const novaLegenda = window.prompt(`Editar legenda para: ${attachment.nome_arquivo}`, attachment.legenda || '');
-    if (novaLegenda !== null) {
-      try {
-        await updateDoc(doc(db, 'individual_attachments', attachment.id), {
-          legenda: novaLegenda
-        });
-        fetchAttachments();
-      } catch (err) {
-        console.error("Erro ao atualizar legenda:", err);
-        handleFirestoreError(err, OperationType.UPDATE, `individual_attachments/${attachment.id}`);
-        alert('Erro ao atualizar legenda.');
+    setPromptData({
+      title: `Editar legenda para: ${attachment.nome_arquivo}`,
+      placeholder: 'Legenda do documento...',
+      value: attachment.legenda || '',
+      onConfirm: async (novaLegenda) => {
+        try {
+          await updateDoc(doc(db, 'individual_attachments', attachment.id), {
+            legenda: novaLegenda
+          });
+          fetchAttachments();
+        } catch (err) {
+          console.error("Erro ao atualizar legenda:", err);
+          handleFirestoreError(err, OperationType.UPDATE, `individual_attachments/${attachment.id}`);
+        }
       }
-    }
+    });
   };
 
   const handleAddRelationship = async (rel: Omit<Relationship, 'id' | 'created_at'>) => {
@@ -293,24 +301,30 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   };
 
   const removeRelationship = async (id: string) => {
-    if (!confirm('Excluir este relacionamento?')) return;
-    try {
-      await deleteDoc(doc(db, 'individual_relationships', id));
-      fetchRelationships();
-    } catch (err) {
-      console.error("Erro ao excluir relacionamento:", err);
-      handleFirestoreError(err, OperationType.DELETE, `individual_relationships/${id}`);
-    }
+    setItemToDelete({ id, type: 'RELATIONSHIP' });
   };
 
   const removeAttachment = async (id: string) => {
-    if (!confirm('Excluir este anexo permanentemente?')) return;
+    setItemToDelete({ id, type: 'ATTACHMENT' });
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+    setIsSaving(true);
     try {
-      await deleteDoc(doc(db, 'individual_attachments', id));
-      fetchAttachments();
+      if (itemToDelete.type === 'RELATIONSHIP') {
+        await deleteDoc(doc(db, 'individual_relationships', itemToDelete.id));
+        fetchRelationships();
+      } else {
+        await deleteDoc(doc(db, 'individual_attachments', itemToDelete.id));
+        fetchAttachments();
+      }
+      setItemToDelete(null);
     } catch (err) {
-      console.error("Erro ao excluir anexo:", err);
-      handleFirestoreError(err, OperationType.DELETE, `individual_attachments/${id}`);
+      console.error("Erro ao excluir item:", err);
+      handleFirestoreError(err, OperationType.DELETE, itemToDelete.type === 'RELATIONSHIP' ? `individual_relationships/${itemToDelete.id}` : `individual_attachments/${itemToDelete.id}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -330,6 +344,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
         documento: formData.documento || '',
         mae: formData.mae?.toUpperCase() || '',
         endereco: formData.endereco || '',
+        cidade: formData.cidade || '',
         data_nascimento: formData.data_nascimento || '', 
         updated_at: new Date().toISOString()
       });
@@ -386,6 +401,15 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                       <i className="fas fa-star mr-1"></i> Foto de Capa
                     </div>
                   )}
+                  <div className="absolute bottom-3 right-3 flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setIsManagingPhotos(true)}
+                      className="bg-navy-900/80 backdrop-blur-md text-[10px] font-black text-white px-3 py-1.5 rounded-lg border border-white/10 uppercase tracking-widest hover:bg-navy-900 transition-all"
+                    >
+                      <i className="fas fa-images mr-2"></i> Gerenciar Fotos
+                    </button>
+                  </div>
                   {photos.length > 1 && (
                     <div className="absolute top-3 right-3 bg-navy-900/60 backdrop-blur-md text-[10px] font-black text-white px-3 py-1 rounded-full border border-white/10 uppercase tracking-widest">
                       {currentPhotoIndex + 1} / {photos.length}
@@ -402,6 +426,13 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                 <div className="flex flex-col items-center justify-center opacity-20">
                   <i className="fas fa-user-secret text-6xl text-navy-200"></i>
                   <span className="text-[10px] font-black uppercase mt-4 text-navy-950">Sem mídia registrada</span>
+                  <button 
+                    type="button"
+                    onClick={() => setIsManagingPhotos(true)}
+                    className="mt-4 bg-navy-900 text-white px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-navy-800 transition-all"
+                  >
+                    <i className="fas fa-plus mr-2"></i> Adicionar Fotos
+                  </button>
                 </div>
               )}
             </div>
@@ -569,6 +600,74 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
       </div>
 
       {viewingAttachment && <AttachmentViewerModal attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />}
+
+      {isManagingPhotos && (
+        <ManagePhotosModal 
+          individual={{ id: individual.id, nome: individual.nome }}
+          onClose={() => setIsManagingPhotos(false)}
+          onSave={() => {
+            setIsManagingPhotos(false);
+            onSave(formData); // Trigger refresh
+          }}
+          currentUser={currentUser}
+        />
+      )}
+
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md">
+          <div className="bg-white border-2 border-red-600 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-red-600 p-6 flex items-center gap-4">
+              <i className="fas fa-exclamation-triangle text-white text-3xl"></i>
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirmar Exclusão</h3>
+            </div>
+            <div className="p-8 space-y-6">
+              <p className="text-navy-950 text-sm font-medium">Tem certeza que deseja excluir este {itemToDelete.type === 'RELATIONSHIP' ? 'relacionamento' : 'anexo'} permanentemente?</p>
+              <div className="flex gap-4">
+                <button onClick={() => setItemToDelete(null)} className="flex-1 bg-navy-50 text-navy-900 font-black py-4 rounded-2xl uppercase text-[10px]">Cancelar</button>
+                <button onClick={confirmDelete} disabled={isSaving} className="flex-1 bg-red-600 text-white font-black py-4 rounded-2xl uppercase text-[10px]">{isSaving ? <i className="fas fa-spinner fa-spin"></i> : 'Excluir'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promptData && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md">
+          <div className="bg-white border border-navy-100 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-navy-900 p-6">
+              <h3 className="text-lg font-black text-white uppercase tracking-tighter">{promptData.title}</h3>
+            </div>
+            <div className="p-8 space-y-6">
+              <input 
+                type="text" 
+                autoFocus
+                className="w-full bg-navy-50 border border-navy-200 rounded-xl px-4 py-3 text-navy-950 outline-none focus:ring-2 focus:ring-navy-900 font-bold"
+                placeholder={promptData.placeholder}
+                value={promptData.value}
+                onChange={(e) => setPromptData({ ...promptData, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    promptData.onConfirm(promptData.value);
+                    setPromptData(null);
+                  }
+                }}
+              />
+              <div className="flex gap-4">
+                <button onClick={() => setPromptData(null)} className="flex-1 bg-navy-50 text-navy-900 font-black py-4 rounded-2xl uppercase text-[10px]">Cancelar</button>
+                <button 
+                  onClick={() => {
+                    promptData.onConfirm(promptData.value);
+                    setPromptData(null);
+                  }} 
+                  className="flex-1 bg-navy-900 text-white font-black py-4 rounded-2xl uppercase text-[10px]"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -15,6 +15,7 @@ const ROList: React.FC<ROListProps> = ({ user }) => {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [occurrencesRO, setOccurrencesRO] = useState<OccurrenceRO[]>([]);
+  const [roToDelete, setRoToDelete] = useState<{ id: string, nr: string } | null>(null);
   
   // RO Form State
   const [nrRO, setNrRO] = useState('');
@@ -82,15 +83,19 @@ const ROList: React.FC<ROListProps> = ({ user }) => {
     }
   };
 
-  const deleteRO = async (id: string, nr: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o R.O ${nr}?`)) return;
+  const deleteRO = async () => {
+    if (!roToDelete) return;
+    setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, 'occurrences_ro', id));
-      await logAction(user!.id, user!.nome, 'DELETE_RO', `Excluiu R.O Nr: ${nr}`);
+      await deleteDoc(doc(db, 'occurrences_ro', roToDelete.id));
+      await logAction(user!.id, user!.nome, 'DELETE_RO', `Excluiu R.O Nr: ${roToDelete.nr}`);
       setAlertMessage('R.O excluído com sucesso!');
+      setRoToDelete(null);
       fetchROs();
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, 'occurrences_ro');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,7 +149,7 @@ const ROList: React.FC<ROListProps> = ({ user }) => {
             </div>
             <div className="flex gap-2">
               <button onClick={() => openEditModal(ro)} className="p-2 text-navy-500 hover:text-navy-900"><Edit2 size={18} /></button>
-              <button onClick={() => deleteRO(ro.id, ro.nr_ro)} className="p-2 text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+              <button onClick={() => setRoToDelete({ id: ro.id, nr: ro.nr_ro })} className="p-2 text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
             </div>
           </div>
         ))}
@@ -205,6 +210,24 @@ const ROList: React.FC<ROListProps> = ({ user }) => {
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {roToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md">
+          <div className="bg-white border-2 border-red-600 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-red-600 p-6 flex items-center gap-4">
+              <i className="fas fa-exclamation-triangle text-white text-3xl"></i>
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirmar Exclusão</h3>
+            </div>
+            <div className="p-8 space-y-6">
+              <p className="text-navy-950 text-sm font-medium">Tem certeza que deseja excluir o R.O <span className="font-black text-red-600">{roToDelete.nr}</span> permanentemente?</p>
+              <div className="flex gap-4">
+                <button onClick={() => setRoToDelete(null)} className="flex-1 bg-navy-50 text-navy-900 font-black py-4 rounded-2xl uppercase text-[10px]">Cancelar</button>
+                <button onClick={deleteRO} disabled={isSubmitting} className="flex-1 bg-red-600 text-white font-black py-4 rounded-2xl uppercase text-[10px]">{isSubmitting ? <i className="fas fa-spinner fa-spin"></i> : 'Excluir'}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

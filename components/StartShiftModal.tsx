@@ -126,6 +126,7 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
   const [allOperators, setAllOperators] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState(user?.unidade || '');
   const [activeRole, setActiveRole] = useState<keyof SeatAssignment | null>('motorista');
   const [assignments, setAssignments] = useState<SeatAssignment>({
     comandante: '',
@@ -184,7 +185,7 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
         patrulheiro_2: assignments.patrulheiro_2,
         criado_por: user?.id || '',
         status: 'ATIVO',
-        unidade: user?.unidade || '',
+        unidade: selectedUnit,
         horario_inicio: new Date().toISOString()
       });
 
@@ -225,6 +226,24 @@ const StartShiftModal: React.FC<StartShiftModalProps> = ({ user, onClose, onStar
         <div className="w-full md:w-[480px] bg-navy-50 border-r border-navy-100 flex flex-col overflow-hidden">
           <div className="p-4 border-b border-navy-100 shrink-0">
             <h3 className="text-navy-950 font-black uppercase tracking-tighter text-sm mb-3">Efetivo Disponível</h3>
+            
+            {/* Unit Selection (Only if multiple units available) */}
+            {(user?.unidades_extras && user.unidades_extras.length > 0) && (
+              <div className="mb-4">
+                <label className="block text-[8px] font-black text-navy-400 uppercase tracking-widest mb-1">Unidade de Atuação</label>
+                <select 
+                  value={selectedUnit}
+                  onChange={e => setSelectedUnit(e.target.value)}
+                  className="w-full bg-white border border-navy-200 rounded-lg px-3 py-2 text-[10px] font-bold text-navy-950 outline-none focus:ring-1 focus:ring-navy-500 transition-all"
+                >
+                  <option value={user?.unidade}>{user?.unidade}</option>
+                  {user?.unidades_extras.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="relative">
               <input 
                 type="text" 

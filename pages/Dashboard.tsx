@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Siren } from 'lucide-react';
 import { User, UserRole, Shift, Unit, SystemVersion } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { checkIsAdmin } from '../lib/utils';
 import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import TacticalLogo from '../components/TacticalLogo';
 import TacticalAlert from '../components/TacticalAlert';
@@ -106,7 +107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const checkShifts = async () => {
       try {
         const shiftsRef = collection(db, 'vtr_services');
-        const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+        const isAdmin = checkIsAdmin(user);
         
         let q = query(
           shiftsRef,
@@ -114,11 +115,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           orderBy('horario_inicio', 'desc')
         );
 
-        if (unitFilter) {
+        if (!isAdmin && user?.unidade) {
           q = query(
             shiftsRef,
             where('status', '==', 'ATIVO'),
-            unitFilter,
+            where('unidade', '==', user.unidade),
             orderBy('horario_inicio', 'desc')
           );
         }
@@ -156,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     );
   };
 
-  const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER;
+  const isAdmin = checkIsAdmin(user);
   const inAnyShift = isUserInAnyShift(user?.nome, activeShifts);
   const canRegisterApproach = isAdmin || inAnyShift;
 

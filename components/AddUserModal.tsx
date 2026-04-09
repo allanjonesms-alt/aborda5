@@ -28,6 +28,11 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('AddUserModal: Units snapshot received, size:', snapshot.size);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Unit));
+      // Ensure FORÇA TÁTICA is always available in the list
+      if (!data.some(u => u.nome === 'FORÇA TÁTICA')) {
+        data.push({ id: 'ft-default', nome: 'FORÇA TÁTICA' } as Unit);
+        data.sort((a, b) => a.nome.localeCompare(b.nome));
+      }
       setUnits(data);
     });
     return () => unsubscribe();

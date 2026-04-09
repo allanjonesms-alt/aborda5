@@ -15,6 +15,7 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [occurrencesSS, setOccurrencesSS] = useState<OccurrenceSS[]>([]);
+  const [ssToDelete, setSsToDelete] = useState<{ id: string, nr: string } | null>(null);
   
   // SS Form State
   const [nrSS, setNrSS] = useState('');
@@ -81,15 +82,19 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
     }
   };
 
-  const deleteSS = async (id: string, nr: string) => {
-    if (!confirm(`Tem certeza que deseja excluir a S.S ${nr}?`)) return;
+  const deleteSS = async () => {
+    if (!ssToDelete) return;
+    setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, 'occurrences', id));
-      await logAction(user!.id, user!.nome, 'DELETE_SS', `Excluiu S.S Nr: ${nr}`);
+      await deleteDoc(doc(db, 'occurrences', ssToDelete.id));
+      await logAction(user!.id, user!.nome, 'DELETE_SS', `Excluiu S.S Nr: ${ssToDelete.nr}`);
       setAlertMessage('S.S excluída com sucesso!');
+      setSsToDelete(null);
       fetchSSs();
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, 'occurrences');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -134,7 +139,7 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
             </div>
             <div className="flex gap-2">
               <button onClick={() => openEditModal(ss)} className="p-2 text-navy-500 hover:text-navy-900"><Edit2 size={18} /></button>
-              <button onClick={() => deleteSS(ss.id, ss.nr_ss)} className="p-2 text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+              <button onClick={() => setSsToDelete({ id: ss.id, nr: ss.nr_ss })} className="p-2 text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
             </div>
           </div>
         ))}
@@ -195,6 +200,24 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {ssToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy-950/90 backdrop-blur-md">
+          <div className="bg-white border-2 border-navy-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-navy-900 p-6 flex items-center gap-4">
+              <i className="fas fa-exclamation-triangle text-white text-3xl"></i>
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter">Confirmar Exclusão</h3>
+            </div>
+            <div className="p-8 space-y-6">
+              <p className="text-navy-950 text-sm font-medium">Tem certeza que deseja excluir a S.S <span className="font-black text-navy-900">{ssToDelete.nr}</span> permanentemente?</p>
+              <div className="flex gap-4">
+                <button onClick={() => setSsToDelete(null)} className="flex-1 bg-navy-50 text-navy-900 font-black py-4 rounded-2xl uppercase text-[10px]">Cancelar</button>
+                <button onClick={deleteSS} disabled={isSubmitting} className="flex-1 bg-navy-900 text-white font-black py-4 rounded-2xl uppercase text-[10px]">{isSubmitting ? <i className="fas fa-spinner fa-spin"></i> : 'Excluir'}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

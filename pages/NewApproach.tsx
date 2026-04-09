@@ -6,7 +6,7 @@ import { db, handleFirestoreError, OperationType, logAction } from '../firebase'
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, writeBatch, addDoc, updateDoc } from 'firebase/firestore';
 import LocationPickerModal from '../components/LocationPickerModal';
 import TacticalAlert from '../components/TacticalAlert';
-import { maskCPF, validateCPF, allowedCities, checkCity } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity, getCityFromAddressComponents } from '../lib/utils';
 import { Shift, User, UserRole, Individual, DBApproach, Relationship } from '../types';
 import { loadGoogleMaps } from '../lib/googleMaps';
 import RelationshipSection from '../components/RelationshipSection';
@@ -64,6 +64,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
     data_nascimento: '',
     mae: '',
     endereco_residencial: '',
+    cidade: '',
     faccao: '',
     observacao: ''
   });
@@ -124,6 +125,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
                     data_nascimento: ind.data_nascimento || '',
                     mae: ind.mae || '',
                     endereco_residencial: ind.endereco || '',
+                    cidade: ind.cidade || '',
                     faccao: ind.faccao || '',
                     observacao: ind.observacao || ''
                   });
@@ -274,7 +276,11 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           return;
         }
 
-        setIndividualData(prev => ({ ...prev, endereco_residencial: place.formatted_address }));
+        setIndividualData(prev => ({ 
+          ...prev, 
+          endereco_residencial: place.formatted_address,
+          cidade: getCityFromAddressComponents(place.address_components || [])
+        }));
       });
     }
 
@@ -295,7 +301,11 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           return;
         }
 
-        setApproachData(prev => ({ ...prev, local: place.formatted_address }));
+        setApproachData(prev => ({ 
+          ...prev, 
+          local: place.formatted_address,
+          cidade: getCityFromAddressComponents(place.address_components || [])
+        }));
       });
     }
   };
@@ -364,6 +374,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
       data_nascimento: ind.data_nascimento || '',
       mae: ind.mae || '',
       endereco_residencial: ind.endereco || '',
+      cidade: ind.cidade || '',
       faccao: ind.faccao || '',
       observacao: ind.observacao || ''
     });
@@ -373,6 +384,36 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
     if (residentialAddressRef.current) {
         residentialAddressRef.current.value = ind.endereco || '';
     }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach((file: File) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          setPhotos(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 9),
+            data: base64String,
+            isPrincipal: prev.length === 0
+          }]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePhoto = (id: string) => {
+    setPhotos(prev => prev.filter(p => p.id !== id));
+  };
+
+  const setPrincipalPhoto = (id: string) => {
+    setPhotos(prev => prev.map(p => ({
+      ...p,
+      isPrincipal: p.id === id
+    })));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -394,6 +435,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           data_nascimento: individualData.data_nascimento,
           mae: individualData.mae.toUpperCase(),
           endereco: individualData.endereco_residencial,
+          cidade: individualData.cidade,
           faccao: individualData.faccao,
           unidade: user?.unidade || '',
           updated_at: new Date().toISOString()
@@ -420,6 +462,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           data_nascimento: individualData.data_nascimento,
           mae: individualData.mae.toUpperCase(),
           endereco: individualData.endereco_residencial,
+          cidade: individualData.cidade,
           faccao: individualData.faccao,
           unidade: user?.unidade || '',
           created_at: new Date().toISOString()
@@ -463,6 +506,19 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           individuo_id: indId,
           relacionado_id: rel.relacionado_id,
           tipo: rel.tipo,
+          created_by: user?.nome || 'Sistema',
+          created_at: new Date().toISOString()
+        });
+      });
+
+      // Salvar Fotos
+      photos.forEach((p, i) => {
+        const photoRef = doc(collection(db, 'individual_photos'));
+        batch.set(photoRef, {
+          individuo_id: indId,
+          path: p.data,
+          is_primary: p.isPrincipal,
+          sort_order: i,
           created_by: user?.nome || 'Sistema',
           created_at: new Date().toISOString()
         });
@@ -788,14 +844,39 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
               capture="environment"
               multiple
               className="hidden"
-              onChange={(e) => {
-                if (e.target.files) {
-                  // Lógica para processar arquivos selecionados
-                  console.log("Arquivos selecionados:", e.target.files);
-                }
-              }}
+              onChange={handlePhotoChange}
             />
-            {/* Aqui você pode mapear as fotos selecionadas para exibição */}
+            
+            {photos.map((photo) => (
+              <div key={photo.id} className={`relative w-32 h-32 rounded-2xl border-2 overflow-hidden group/photo transition-all ${photo.isPrincipal ? 'border-forest-600 ring-2 ring-forest-600/10' : 'border-navy-100'}`}>
+                <img src={photo.data} className="w-full h-full object-cover" alt="Abordado" />
+                
+                <div className="absolute inset-0 bg-navy-900/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setPrincipalPhoto(photo.id)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${photo.isPrincipal ? 'bg-forest-600 text-white' : 'bg-white text-navy-900 hover:bg-forest-600 hover:text-white'}`}
+                    title="Definir como Principal"
+                  >
+                    <i className="fas fa-star text-xs"></i>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => removePhoto(photo.id)}
+                    className="w-8 h-8 bg-white text-red-600 hover:bg-red-600 hover:text-white rounded-full flex items-center justify-center transition-all"
+                    title="Remover"
+                  >
+                    <i className="fas fa-trash-alt text-xs"></i>
+                  </button>
+                </div>
+
+                {photo.isPrincipal && (
+                  <div className="absolute top-2 left-2 bg-forest-600 text-[8px] font-black text-white px-1.5 py-0.5 rounded uppercase shadow-lg">
+                    Capa
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 

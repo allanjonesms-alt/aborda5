@@ -14,6 +14,7 @@ export interface User {
   primeiro_acesso: boolean;
   ord?: number;
   unidade?: string;
+  unidades_extras?: string[];
 }
 
 export interface Shift {
@@ -48,6 +49,7 @@ export interface Individual {
   faccao?: string;
   observacao?: string;
   unidade?: string;
+  cidade?: string;
   created_at?: string;
   updated_at?: string;
   fotos_individuos?: PhotoRecord[];

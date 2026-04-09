@@ -5,6 +5,7 @@ import { Siren } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { DBApproach, Individual, User } from '../types';
+import { checkIsAdmin } from '../lib/utils';
 
 import { loadGoogleMaps } from '../lib/googleMaps';
 
@@ -35,7 +36,8 @@ const MapPage: React.FC<MapPageProps> = ({ user }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+        const isAdmin = checkIsAdmin(user);
+        const unitFilter = (!isAdmin && user?.unidade) ? where('unidade', '==', user.unidade) : null;
         
         const approachesRef = collection(db, 'approaches');
         const individualsRef = collection(db, 'individuals');

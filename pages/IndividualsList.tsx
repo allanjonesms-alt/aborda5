@@ -5,7 +5,8 @@ import { collection, query, where, orderBy, limit, getDocs, startAfter, getCount
 import AddIndividualModal from '../components/AddIndividualModal';
 import ManagePhotosModal from '../components/ManagePhotosModal';
 import EditIndividualModal from '../components/EditIndividualModal';
-import { Individual, User, PhotoRecord } from '../types';
+import { Individual, User, PhotoRecord, UserRole } from '../types';
+import { allowedCities, RIO_VERDE_VARIATIONS, checkIsAdmin } from '../lib/utils';
 
 interface IndividualsListProps {
   user: User | null;
@@ -96,6 +97,25 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
+  const userCity = user?.unidade?.toUpperCase().replace(/[\s/]+/g, '') || '';
+  
+  // Find the matching city from allowedCities by normalizing both
+  const matchedCity = allowedCities.find(city => {
+    const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
+    const isMatch = normalizedCity.includes(userCity) || (userCity.includes('RIOVERDE') && normalizedCity === '2ªCIARIOVERDE');
+    return isMatch;
+  });
+
+  const isAdmin = checkIsAdmin(user);
+  const [activeFilter, setActiveFilter] = useState(isAdmin ? 'TODOS' : (matchedCity || 'TODOS'));
+
+  // Force filter for non-admins
+  useEffect(() => {
+    if (!isAdmin && matchedCity) {
+      setActiveFilter(matchedCity);
+    }
+  }, [isAdmin, matchedCity]);
+
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(handler);
@@ -118,7 +138,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       return;
     }
 
-    console.log('Fetching individuals:', { isInitial, searchTerm, faction, lastDoc });
+    console.log('Fetching individuals:', { isInitial, searchTerm, faction, lastDoc, activeFilter });
     if (isInitial) {
       setIsLoading(true);
       setLastDoc(null);
@@ -132,7 +152,8 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       let q;
 
       // Filtro de unidade
-      const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const isAdmin = checkIsAdmin(user);
+      const unitFilter = (!isAdmin && user?.unidade) ? where('unidade', '==', user.unidade) : null;
       const factionFilterClause = faction ? where('faccao', '==', faction) : null;
 
       if (isInitial) {
@@ -147,6 +168,19 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       const queryConstraints = [];
       if (unitFilter) queryConstraints.push(unitFilter);
       if (factionFilterClause) queryConstraints.push(factionFilterClause);
+      
+      // Filtro de cidade (Server-side)
+      if (activeFilter !== 'TODOS') {
+        if (activeFilter === 'OUTROS') {
+          // Para 'OUTROS', ainda precisamos de lógica especial. 
+          // Se o volume for baixo, podemos buscar mais e filtrar, 
+          // mas o ideal seria ter um campo 'cidade' preenchido.
+          // Por enquanto, vamos manter a lógica de 'cidade' ser um campo.
+          queryConstraints.push(where('cidade', '==', ''));
+        } else {
+          queryConstraints.push(where('cidade', '==', activeFilter));
+        }
+      }
       
       if (searchTerm.trim()) {
         const s = searchTerm.trim().toUpperCase();
@@ -164,7 +198,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
 
       const querySnapshot = await getDocs(q);
       
-      const newIndividuals: Individual[] = [];
+      let newIndividuals: Individual[] = [];
       
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
@@ -222,16 +256,23 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
 
   useEffect(() => {
     fetchIndividuals(true, debouncedSearch, factionFilter);
-  }, [debouncedSearch, factionFilter]);
+  }, [debouncedSearch, factionFilter, activeFilter]);
 
   const handleSave = () => {
     setIndividuals([]);
-    fetchIndividuals(true, debouncedSearch);
+    fetchIndividuals(true, debouncedSearch, factionFilter);
+  };
+
+  const getAvailableFilters = () => {
+    if (!isAdmin && matchedCity) {
+      return [matchedCity];
+    }
+    return ['TODOS', ...allowedCities, 'OUTROS'];
   };
 
   return (
     <div className="max-w-7xl mx-auto py-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6 px-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-6 px-4">
         <div className="flex items-center space-x-5">
           <div className="bg-forest-600 p-4 rounded-2xl shadow-xl shadow-forest-600/20">
             <i className="fas fa-user-shield text-white text-2xl"></i>
@@ -273,6 +314,18 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
             <i className="fas fa-plus"></i> Novo Cadastro
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 px-4 mb-8">
+        {getAvailableFilters().map(city => (
+          <button 
+            key={city} 
+            onClick={() => setActiveFilter(city)} 
+            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border transition-all ${activeFilter === city ? 'bg-navy-600 border-navy-500 text-white shadow-xl scale-105' : 'bg-white border-navy-200 text-navy-400 hover:border-navy-500 hover:bg-navy-50'}`}
+          >
+            {city}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 px-4">

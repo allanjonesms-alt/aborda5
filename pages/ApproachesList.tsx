@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
 import { DBApproach, Individual } from '../types';
-import { formatAddress } from '../lib/utils';
+import { formatAddress, checkIsAdmin } from '../lib/utils';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -217,7 +217,8 @@ const ApproachesList: React.FC<ApproachesListProps> = ({ user }) => {
 
     try {
       const approachesRef = collection(db, 'approaches');
-      const unitFilter = (user?.role !== 'ADMIN' && user?.role !== 'MASTER' && user?.unidade) ? where('unidade', '==', user.unidade) : null;
+      const isAdmin = checkIsAdmin(user);
+      const unitFilter = (!isAdmin && user?.unidade) ? where('unidade', '==', user.unidade) : null;
       
       let q = query(approachesRef, orderBy('data', 'desc'), limit(ITEMS_PER_PAGE));
 
