@@ -413,7 +413,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                 <div>
                   <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Unidade Principal</label>
                   <select 
-                    value={editingUser.unidade || ''} 
+                    value={units.find(u => u.nome.toUpperCase() === (editingUser.unidade || '').toUpperCase())?.nome || ''} 
                     onChange={e => setEditingUser({...editingUser, unidade: e.target.value})}
                     className="w-full bg-gray-50 border border-navy-100 rounded-xl p-4 text-navy-950 font-bold focus:ring-2 focus:ring-navy-500 outline-none appearance-none"
                   >
@@ -442,8 +442,8 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                 <div className="bg-navy-50 p-4 rounded-2xl border border-navy-100">
                   <label className="block text-[10px] font-black text-navy-400 uppercase tracking-widest mb-3">Unidades Adicionais de Atuação</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {units.filter(u => u.nome !== editingUser.unidade).map(unit => {
-                      const isSelected = editingUser.unidades_extras?.includes(unit.nome);
+                    {units.filter(u => u.nome.toUpperCase() !== (editingUser.unidade || '').toUpperCase()).map(unit => {
+                      const isSelected = editingUser.unidades_extras?.some(e => e.toUpperCase() === unit.nome.toUpperCase());
                       return (
                         <button
                           key={unit.id}
@@ -451,7 +451,7 @@ const Operators: React.FC<OperatorsProps> = ({ user }) => {
                           onClick={() => {
                             const extras = editingUser.unidades_extras || [];
                             const newExtras = isSelected 
-                              ? extras.filter(e => e !== unit.nome)
+                              ? extras.filter(e => e.toUpperCase() !== unit.nome.toUpperCase())
                               : [...extras, unit.nome];
                             setEditingUser({ ...editingUser, unidades_extras: newExtras });
                           }}

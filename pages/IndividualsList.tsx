@@ -12,7 +12,7 @@ interface IndividualsListProps {
   user: User | null;
 }
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 50;
 
 const IndividualSkeleton = () => (
   <div className="bg-white border border-navy-100 rounded-3xl h-[110px] sm:h-[180px] animate-pulse overflow-hidden flex flex-col p-4 sm:p-5 space-y-3">
@@ -93,7 +93,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   const [isAddingIndividual, setIsAddingIndividual] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [lastDoc, setLastDoc] = useState<any>(null);
+  const lastDocRef = useRef<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -115,6 +115,13 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       setActiveFilter(matchedCity);
     }
   }, [isAdmin, matchedCity]);
+
+  const setActiveFilterAndReset = (city: string) => {
+    setActiveFilter(city);
+    lastDocRef.current = null; // Reset pagination
+    setIndividuals([]); // Clear current list
+    setIsLoading(true); // Show loading state
+  };
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 400);
@@ -138,10 +145,10 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       return;
     }
 
-    console.log('Fetching individuals:', { isInitial, searchTerm, faction, lastDoc, activeFilter });
+    console.log('Fetching individuals:', { isInitial, searchTerm, faction, lastDoc: lastDocRef.current, activeFilter });
     if (isInitial) {
       setIsLoading(true);
-      setLastDoc(null);
+      lastDocRef.current = null;
       setError(null); // Reset error on new fetch
     } else {
       setIsLoadingMore(true);
@@ -166,19 +173,30 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       }
 
       const queryConstraints = [];
-      if (unitFilter) queryConstraints.push(unitFilter);
-      if (factionFilterClause) queryConstraints.push(factionFilterClause);
+      if (unitFilter) {
+        console.log('Adding unit filter:', unitFilter);
+        queryConstraints.push(unitFilter);
+      }
+      if (factionFilterClause) {
+        console.log('Adding faction filter:', factionFilterClause);
+        queryConstraints.push(factionFilterClause);
+      }
       
       // Filtro de cidade (Server-side)
+      console.log('[DEBUG] Applying city filter. activeFilter:', activeFilter);
       if (activeFilter !== 'TODOS') {
         if (activeFilter === 'OUTROS') {
-          // Para 'OUTROS', ainda precisamos de lógica especial. 
-          // Se o volume for baixo, podemos buscar mais e filtrar, 
-          // mas o ideal seria ter um campo 'cidade' preenchido.
-          // Por enquanto, vamos manter a lógica de 'cidade' ser um campo.
+          console.log('[DEBUG] Pushing OUTROS filter');
           queryConstraints.push(where('cidade', '==', ''));
+        } else if (activeFilter === '2ª CIA/RIO VERDE') {
+          console.log('[DEBUG] Pushing RIO VERDE filter');
+          queryConstraints.push(where('cidade', 'in', ['2ª CIA/RIO VERDE', 'RIO VERDE DE MT']));
         } else {
-          queryConstraints.push(where('cidade', '==', activeFilter));
+          console.log('[DEBUG] Applying generic city filter:', activeFilter);
+          const cityFilter = where('cidade', '==', activeFilter);
+          console.log('[DEBUG] Created city filter:', cityFilter);
+          queryConstraints.push(cityFilter);
+          console.log('[DEBUG] Pushed generic city filter. New length:', queryConstraints.length);
         }
       }
       
@@ -188,37 +206,53 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         queryConstraints.push(where('nome', '<=', s + '\uf8ff'));
       }
       
+      // Ordenação alfabética por nome
       queryConstraints.push(orderBy('nome'));
+      
+      console.log('Query constraints (raw):', queryConstraints);
+      console.log('Query constraints (JSON):', JSON.stringify(queryConstraints.map(c => c.type)));
       
       q = query(individualsRef, ...queryConstraints, limit(ITEMS_PER_PAGE));
 
-      if (!isInitial && lastDoc) {
-        q = query(q, startAfter(lastDoc));
+      if (!isInitial && lastDocRef.current) {
+        q = query(q, startAfter(lastDocRef.current));
       }
 
       const querySnapshot = await getDocs(q);
       
-      let newIndividuals: Individual[] = [];
+      const individualIds = querySnapshot.docs.map(doc => doc.id);
       
-      for (const docSnapshot of querySnapshot.docs) {
-        const data = docSnapshot.data();
-        
-        // Fetch photos for this individual
+      // Fetch photos for all individuals in this page in one query
+      let allPhotos: PhotoRecord[] = [];
+      if (individualIds.length > 0) {
         const photosRef = collection(db, 'individual_photos');
-        const photosQ = query(photosRef, where('individuo_id', '==', docSnapshot.id), orderBy('__name__'));
-        const photosSnapshot = await getDocs(photosQ);
+        // Firestore 'in' query supports up to 30 items.
+        const chunks = [];
+        for (let i = 0; i < individualIds.length; i += 30) {
+          chunks.push(individualIds.slice(i, i + 30));
+        }
         
-        const photos = photosSnapshot.docs.map(pDoc => ({ id: pDoc.id, ...pDoc.data() } as PhotoRecord));
+        for (const chunk of chunks) {
+          const photosQ = query(photosRef, where('individuo_id', 'in', chunk));
+          const photosSnapshot = await getDocs(photosQ);
+          allPhotos.push(...photosSnapshot.docs.map(pDoc => ({ id: pDoc.id, ...pDoc.data() } as PhotoRecord)));
+        }
+      }
+      
+      const newIndividuals: Individual[] = querySnapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
+        console.log('Fetched individual:', data.nome);
+        const photos = allPhotos.filter(p => p.individuo_id === docSnapshot.id);
         
-        newIndividuals.push({
+        return {
           id: docSnapshot.id,
           ...data,
           fotos_individuos: photos
-        } as Individual);
-      }
+        } as Individual;
+      });
 
       setIndividuals(prev => isInitial ? newIndividuals : [...prev, ...newIndividuals]);
-      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      lastDocRef.current = querySnapshot.docs[querySnapshot.docs.length - 1];
       setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE);
     } catch (err: any) {
       console.error('Error fetching individuals:', err);
@@ -252,7 +286,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [lastDoc, user]);
+  }, [user, activeFilter]);
 
   useEffect(() => {
     fetchIndividuals(true, debouncedSearch, factionFilter);
@@ -320,7 +354,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         {getAvailableFilters().map(city => (
           <button 
             key={city} 
-            onClick={() => setActiveFilter(city)} 
+            onClick={() => setActiveFilterAndReset(city)} 
             className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border transition-all ${activeFilter === city ? 'bg-navy-600 border-navy-500 text-white shadow-xl scale-105' : 'bg-white border-navy-200 text-navy-400 hover:border-navy-500 hover:bg-navy-50'}`}
           >
             {city}

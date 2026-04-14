@@ -100,7 +100,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave, currentUse
         senha: formData.senha,
         role: formData.role,
         ord: formData.ord,
-        unidade: formData.unidade.toUpperCase(),
+        unidade: formData.unidade,
         primeiro_acesso: false,
         created_at: new Date().toISOString()
       });

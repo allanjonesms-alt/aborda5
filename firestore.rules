@@ -222,21 +222,21 @@ service cloud.firestore {
     }
 
     match /individual_photos/{photoId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || true); // Allow all authenticated users to read photos, but ADMIN/MASTER have full access
       allow create: if isAuthenticated() && isValidPhoto(request.resource.data);
       allow update: if isAuthenticated() && isValidPhoto(request.resource.data);
       allow delete: if isAdmin() || isMaster();
     }
 
     match /individual_relationships/{relationshipId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || true);
       allow create: if isAuthenticated() && isValidRelationship(request.resource.data);
       allow update: if isAuthenticated() && isValidRelationship(request.resource.data);
       allow delete: if isAdmin() || isMaster();
     }
 
     match /individual_attachments/{attachmentId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isAdmin() || isMaster() || true);
       allow create: if isAuthenticated() && isValidAttachment(request.resource.data);
       allow update: if isAuthenticated() && isValidAttachment(request.resource.data);
       allow delete: if isAdmin() || isMaster();

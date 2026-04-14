@@ -338,11 +338,11 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
     setIsSaving(true);
     try {
       await updateDoc(doc(db, 'individuals', individual.id), {
-        nome: formData.nome.toUpperCase(), 
-        alcunha: formData.alcunha || '', 
+        nome: formData.nome.trim().toUpperCase(), 
+        alcunha: formData.alcunha?.trim() || '', 
         faccao: formData.faccao || '', 
         documento: formData.documento || '',
-        mae: formData.mae?.toUpperCase() || '',
+        mae: formData.mae?.trim().toUpperCase() || '',
         endereco: formData.endereco || '',
         cidade: formData.cidade || '',
         data_nascimento: formData.data_nascimento || '', 

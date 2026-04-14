@@ -189,8 +189,8 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
       const now = new Date().toISOString();
       const individualData = {
         ...formData,
-        nome: formData.nome.toUpperCase(),
-        mae: formData.mae?.toUpperCase() || '',
+        nome: formData.nome.trim().toUpperCase(),
+        mae: formData.mae?.trim().toUpperCase() || '',
         unidade: currentUser?.unidade || '',
         created_at: now,
         updated_at: now
