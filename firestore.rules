@@ -206,6 +206,12 @@ service cloud.firestore {
              data.nr_ro is string && data.fato is string && data.criado_por is string && data.created_at is string;
     }
 
+    function isValidConfidentialInfo(data) {
+      return hasOnlyAllowedFields(['individuo_id', 'conteudo', 'operador_nome', 'operador_id', 'created_at']) &&
+             data.individuo_id is string && data.conteudo is string && data.conteudo.size() > 0 &&
+             data.operador_nome is string && data.operador_id is string && data.created_at is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -247,6 +253,13 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || isForcaTatica() || request.resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade);
       allow update: if isAuthenticated() && (isAdmin() || isMaster() || isForcaTatica() || (resource.data.criado_por == request.auth.uid && resource.data.unidade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unidade)) && isValidApproach(request.resource.data) && (isAdmin() || isMaster() || isForcaTatica() || request.resource.data.unidade == resource.data.unidade);
       allow delete: if isAdmin() || isMaster();
+    }
+
+    match /confidential_info/{infoId} {
+      allow read: if isAuthenticated() && (isAdmin() || isForcaTatica());
+      allow create: if isAuthenticated() && (isAdmin() || isForcaTatica()) && isValidConfidentialInfo(request.resource.data);
+      allow update: if false; // Historical records should not be updated
+      allow delete: if isAdmin();
     }
 
     match /vtr_services/{serviceId} {

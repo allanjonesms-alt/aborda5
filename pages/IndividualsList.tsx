@@ -6,7 +6,7 @@ import AddIndividualModal from '../components/AddIndividualModal';
 import ManagePhotosModal from '../components/ManagePhotosModal';
 import EditIndividualModal from '../components/EditIndividualModal';
 import { Individual, User, PhotoRecord, UserRole } from '../types';
-import { allowedCities, RIO_VERDE_VARIATIONS, checkIsAdmin } from '../lib/utils';
+import { allowedCities, RIO_VERDE_VARIATIONS, checkIsAdmin, extractCityFromAddress } from '../lib/utils';
 
 interface IndividualsListProps {
   user: User | null;
@@ -36,8 +36,8 @@ const IndividualCard = memo(({ ind, onEdit, onManagePhotos }: {
     >
       <div className="flex-1 p-3 sm:p-5 flex flex-col justify-between bg-white min-w-0 h-full">
         <div className="space-y-2 sm:space-y-3 min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
-            <h3 className="text-[10px] sm:text-xs font-black text-navy-950 uppercase truncate max-w-[85%] sm:max-w-[70%] leading-none group-hover:text-forest-500 transition-colors">
+          <div className="flex flex-col gap-1.5 sm:gap-2 min-w-0">
+            <h3 className="text-[10px] sm:text-xs font-black text-navy-950 uppercase truncate leading-none group-hover:text-forest-500 transition-colors">
               {ind.nome}
             </h3>
             <div className="flex gap-1">
@@ -102,7 +102,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   // Find the matching city from allowedCities by normalizing both
   const matchedCity = allowedCities.find(city => {
     const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
-    const isMatch = normalizedCity.includes(userCity) || (userCity.includes('RIOVERDE') && normalizedCity === '2ªCIARIOVERDE');
+    const isMatch = normalizedCity.includes(userCity) || (userCity.includes('RIOVERDE') && normalizedCity === 'RIOVERDE');
     return isMatch;
   });
 
@@ -139,17 +139,15 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   }, [isLoadingMore, isLoading, hasMore, debouncedSearch, factionFilter]);
 
   const fetchIndividuals = useCallback(async (isInitial: boolean = false, searchTerm: string = '', faction: string = '') => {
-    // Só busca se o usuário estiver carregado
     if (!user) {
       console.log('Aguardando carregamento do usuário...');
       return;
     }
 
-    console.log('Fetching individuals:', { isInitial, searchTerm, faction, lastDoc: lastDocRef.current, activeFilter });
     if (isInitial) {
       setIsLoading(true);
       lastDocRef.current = null;
-      setError(null); // Reset error on new fetch
+      setError(null);
     } else {
       setIsLoadingMore(true);
     }
@@ -158,7 +156,6 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       const individualsRef = collection(db, 'individuals');
       let q;
 
-      // Filtro de unidade
       const isAdmin = checkIsAdmin(user);
       const unitFilter = (!isAdmin && user?.unidade) ? where('unidade', '==', user.unidade) : null;
       const factionFilterClause = faction ? where('faccao', '==', faction) : null;
@@ -173,32 +170,8 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       }
 
       const queryConstraints = [];
-      if (unitFilter) {
-        console.log('Adding unit filter:', unitFilter);
-        queryConstraints.push(unitFilter);
-      }
-      if (factionFilterClause) {
-        console.log('Adding faction filter:', factionFilterClause);
-        queryConstraints.push(factionFilterClause);
-      }
-      
-      // Filtro de cidade (Server-side)
-      console.log('[DEBUG] Applying city filter. activeFilter:', activeFilter);
-      if (activeFilter !== 'TODOS') {
-        if (activeFilter === 'OUTROS') {
-          console.log('[DEBUG] Pushing OUTROS filter');
-          queryConstraints.push(where('cidade', '==', ''));
-        } else if (activeFilter === '2ª CIA/RIO VERDE') {
-          console.log('[DEBUG] Pushing RIO VERDE filter');
-          queryConstraints.push(where('cidade', 'in', ['2ª CIA/RIO VERDE', 'RIO VERDE DE MT']));
-        } else {
-          console.log('[DEBUG] Applying generic city filter:', activeFilter);
-          const cityFilter = where('cidade', '==', activeFilter);
-          console.log('[DEBUG] Created city filter:', cityFilter);
-          queryConstraints.push(cityFilter);
-          console.log('[DEBUG] Pushed generic city filter. New length:', queryConstraints.length);
-        }
-      }
+      if (unitFilter) queryConstraints.push(unitFilter);
+      if (factionFilterClause) queryConstraints.push(factionFilterClause);
       
       if (searchTerm.trim()) {
         const s = searchTerm.trim().toUpperCase();
@@ -206,27 +179,55 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         queryConstraints.push(where('nome', '<=', s + '\uf8ff'));
       }
       
-      // Ordenação alfabética por nome
-      queryConstraints.push(orderBy('nome'));
-      
-      console.log('Query constraints (raw):', queryConstraints);
-      console.log('Query constraints (JSON):', JSON.stringify(queryConstraints.map(c => c.type)));
-      
-      q = query(individualsRef, ...queryConstraints, limit(ITEMS_PER_PAGE));
-
-      if (!isInitial && lastDocRef.current) {
-        q = query(q, startAfter(lastDocRef.current));
+      q = individualsRef;
+      for (const constraint of queryConstraints) {
+        try {
+          q = query(q, constraint);
+        } catch (e) {
+          console.error('[DEBUG] Error applying constraint:', constraint, e);
+        }
       }
+      
+      const snapshot = await getDocs(q);
+      
+      let allIndividuals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Individual));
+      
+      // Ordenação em memória
+      allIndividuals.sort((a, b) => a.nome.localeCompare(b.nome));
+      
+      if (activeFilter !== 'TODOS') {
+        allIndividuals = allIndividuals.filter(ind => {
+          const cityFromAddress = extractCityFromAddress(ind.endereco || '');
+          const cityFromField = ind.cidade || '';
+          
+          // Normaliza o filtro ativo para comparação
+          const normalizedActiveFilter = activeFilter.toUpperCase().replace(/[\s/]+/g, '');
+          
+          const checkCity = (city: string) => {
+            if (!city) return false;
+            const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
+            
+            // Trata o código 79480 como Rio Verde
+            if (normalizedCity === '79480') return normalizedActiveFilter.includes('RIOVERDE');
+            
+            // Compara com o filtro ativo
+            return normalizedCity === normalizedActiveFilter || (normalizedActiveFilter.includes('RIOVERDE') && normalizedCity.includes('RIOVERDE'));
+          };
 
-      const querySnapshot = await getDocs(q);
+          return checkCity(cityFromAddress) || checkCity(cityFromField);
+        });
+      }
       
-      const individualIds = querySnapshot.docs.map(doc => doc.id);
+      const startIndex = isInitial ? 0 : (lastDocRef.current ? individuals.length : 0);
+      const paginatedIndividuals = allIndividuals.slice(startIndex, startIndex + ITEMS_PER_PAGE);
       
-      // Fetch photos for all individuals in this page in one query
+      setTotalCount(allIndividuals.length);
+      setHasMore(startIndex + paginatedIndividuals.length < allIndividuals.length);
+      
+      const individualIds = paginatedIndividuals.map(ind => ind.id);
       let allPhotos: PhotoRecord[] = [];
       if (individualIds.length > 0) {
         const photosRef = collection(db, 'individual_photos');
-        // Firestore 'in' query supports up to 30 items.
         const chunks = [];
         for (let i = 0; i < individualIds.length; i += 30) {
           chunks.push(individualIds.slice(i, i + 30));
@@ -239,26 +240,23 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         }
       }
       
-      const newIndividuals: Individual[] = querySnapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
-        console.log('Fetched individual:', data.nome);
-        const photos = allPhotos.filter(p => p.individuo_id === docSnapshot.id);
-        
-        return {
-          id: docSnapshot.id,
-          ...data,
-          fotos_individuos: photos
-        } as Individual;
-      });
+      const newIndividualsWithPhotos = paginatedIndividuals.map(ind => ({
+        ...ind,
+        fotos_individuos: allPhotos.filter(p => p.individuo_id === ind.id)
+      }));
 
-      setIndividuals(prev => isInitial ? newIndividuals : [...prev, ...newIndividuals]);
-      lastDocRef.current = querySnapshot.docs[querySnapshot.docs.length - 1];
-      setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE);
+      if (isInitial) {
+        setIndividuals(newIndividualsWithPhotos);
+      } else {
+        setIndividuals(prev => [...prev, ...newIndividualsWithPhotos]);
+      }
+      
+      lastDocRef.current = snapshot.docs[snapshot.docs.length - 1];
+      setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
     } catch (err: any) {
       console.error('Error fetching individuals:', err);
       let errorMessage = 'Erro ao carregar indivíduos. Tente novamente.';
       
-      // Check if it's a Firestore index error
       if (err.message?.toLowerCase().includes('index') || err.code === 'failed-precondition') {
         const indexLink = err.message?.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
         if (indexLink) {
@@ -278,7 +276,6 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
         } else {
           errorMessage = 'O sistema está preparando os índices de busca ou um índice necessário está ausente. Se você for o administrador, verifique o console do Firebase.';
         }
-        console.error('Firestore Index Error. Full message:', err.message);
       }
       
       setError(errorMessage);
@@ -286,7 +283,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [user, activeFilter]);
+  }, [user, activeFilter, debouncedSearch, factionFilter]);
 
   useEffect(() => {
     fetchIndividuals(true, debouncedSearch, factionFilter);

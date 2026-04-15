@@ -6,7 +6,7 @@ import { db, handleFirestoreError, OperationType, logAction } from '../firebase'
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, writeBatch, addDoc, updateDoc } from 'firebase/firestore';
 import LocationPickerModal from '../components/LocationPickerModal';
 import TacticalAlert from '../components/TacticalAlert';
-import { maskCPF, validateCPF, allowedCities, checkCity, getCityFromAddressComponents } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity, getCityFromAddressComponents, extractCityFromAddress } from '../lib/utils';
 import { Shift, User, UserRole, Individual, DBApproach, Relationship } from '../types';
 import { loadGoogleMaps } from '../lib/googleMaps';
 import RelationshipSection from '../components/RelationshipSection';
@@ -32,8 +32,11 @@ const FACCOES_OPTIONS = [
   { value: 'FDN', label: 'FDN (Família do Norte)' }
 ];
 
+const CIDADES_OPTIONS = [
+  'COXIM', 'RIO VERDE', 'SONORA', 'PEDRO GOMES', 'ALCINÓPOLIS', 'SÃO GABRIEL', 'OUTROS'
+];
+
 const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
-  console.log("NewApproach user:", user);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,7 +67,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
     data_nascimento: '',
     mae: '',
     endereco_residencial: '',
-    cidade: '',
+    cidade: 'COXIM',
     faccao: '',
     observacao: ''
   });
@@ -256,7 +259,7 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
       bounds: bounds,
       strictBounds: true,
       fields: ['formatted_address', 'address_components', 'geometry'],
-      types: ['address']
+      types: ['geocode'] // Changed from ['address'] to ['geocode']
     };
 
     if (residentialAddressRef.current) {
@@ -435,8 +438,9 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           data_nascimento: individualData.data_nascimento,
           mae: individualData.mae.toUpperCase(),
           endereco: individualData.endereco_residencial,
-          cidade: individualData.cidade,
+          cidade: individualData.cidade || extractCityFromAddress(individualData.endereco_residencial),
           faccao: individualData.faccao,
+          observacao: individualData.observacao,
           unidade: user?.unidade || '',
           updated_at: new Date().toISOString()
         });
@@ -462,8 +466,9 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
           data_nascimento: individualData.data_nascimento,
           mae: individualData.mae.toUpperCase(),
           endereco: individualData.endereco_residencial,
-          cidade: individualData.cidade,
+          cidade: individualData.cidade || extractCityFromAddress(individualData.endereco_residencial),
           faccao: individualData.faccao,
+          observacao: individualData.observacao,
           unidade: user?.unidade || '',
           created_at: new Date().toISOString()
         });
@@ -787,7 +792,8 @@ const NewApproach: React.FC<NewApproachProps> = ({ user }) => {
                   ref={residentialAddressRef} 
                   className="w-full bg-white border border-navy-200 text-navy-950 pl-10 pr-4 py-4 rounded-2xl outline-none focus:ring-2 focus:ring-navy-500 transition-all font-bold text-sm" 
                   placeholder="Buscar endereço..." 
-                  defaultValue={individualData.endereco_residencial} 
+                  value={individualData.endereco_residencial}
+                  onChange={e => setIndividualData(prev => ({...prev, endereco_residencial: e.target.value}))}
                 />
                 <i className="fas fa-search-location absolute left-3 top-1/2 -translate-y-1/2 text-navy-300 group-focus-within:text-navy-500 transition-all"></i>
               </div>

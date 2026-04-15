@@ -1,12 +1,13 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, orderBy, limit } from 'firebase/firestore';
 import { Individual, User, PhotoRecord, Relationship, Attachment, DBApproach } from '../types';
-import { maskCPF, validateCPF, allowedCities, checkCity, formatAddress, getCityFromAddressComponents } from '../lib/utils';
+import { maskCPF, validateCPF, allowedCities, checkCity, formatAddress, getCityFromAddressComponents, extractCityFromAddress } from '../lib/utils';
 import { loadGoogleMaps } from '../lib/googleMaps';
 import RelationshipSection from './RelationshipSection';
 import ManagePhotosModal from './ManagePhotosModal';
+import ConfidentialHistoryModal from './ConfidentialHistoryModal';
 
 interface AttachmentViewerModalProps {
   attachment: Attachment;
@@ -78,6 +79,10 @@ const FACCOES_OPTIONS = [
 const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, onClose, onSave, currentUser }) => {
   const [formData, setFormData] = useState<Individual>({ ...individual });
   const [isSaving, setIsSaving] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [isAddingConfidential, setIsAddingConfidential] = useState(false);
+  const [newConfidentialText, setNewConfidentialText] = useState('');
+  const [isSavingConfidential, setIsSavingConfidential] = useState(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [approachesHistory, setApproachesHistory] = useState<DBApproach[]>([]);
@@ -114,7 +119,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
         bounds: bounds,
         strictBounds: true,
         fields: ['formatted_address', 'address_components', 'geometry'],
-        types: ['address']
+        types: ['geocode'] // Changed from ['address'] to ['geocode']
       };
 
       autocompleteInstance.current = new google.maps.places.Autocomplete(
@@ -149,19 +154,23 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
     const setup = async () => {
       try {
         await loadGoogleMaps();
-        if (isEditing) initAutocomplete();
       } catch (err) {
         console.error("Erro ao carregar Google Maps no EditIndividualModal:", err);
       }
     };
 
     setup();
-    const timer = setTimeout(() => { if (isEditing) initAutocomplete(); }, 1000);
     return () => {
       document.body.style.overflow = 'unset';
-      clearTimeout(timer);
     };
   }, [individual.id]);
+
+  useEffect(() => {
+    if (isEditing) {
+      const timer = setTimeout(initAutocomplete, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditing]);
 
   const fetchRelationships = async () => {
     try {
@@ -195,11 +204,17 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
       const q = query(
         collection(db, 'individual_attachments'), 
         where('individuo_id', '==', individual.id),
-        orderBy('created_at', 'desc')
+        limit(100)
       );
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Attachment));
-      setAttachments(data);
+      
+      // Ordenação em memória para evitar necessidade de índice composto
+      const sortedData = data.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setAttachments(sortedData);
     } catch (err) {
       console.error("Erro ao buscar anexos:", err);
       handleFirestoreError(err, OperationType.LIST, 'individual_attachments');
@@ -211,11 +226,19 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
       const q = query(
         collection(db, 'approaches'), 
         where('individuo_id', '==', individual.id),
-        orderBy('data', 'desc')
+        limit(100)
       );
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as DBApproach));
-      setApproachesHistory(data);
+      
+      // Ordenação em memória para evitar necessidade de índice composto
+      const sortedData = data.sort((a, b) => {
+        const dateA = new Date(`${a.data}T${a.horario || '00:00'}`).getTime();
+        const dateB = new Date(`${b.data}T${b.horario || '00:00'}`).getTime();
+        return dateB - dateA;
+      });
+
+      setApproachesHistory(sortedData);
     } catch (err) {
       console.error("Erro ao buscar histórico de abordagens:", err);
       handleFirestoreError(err, OperationType.LIST, 'approaches');
@@ -344,7 +367,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
         documento: formData.documento || '',
         mae: formData.mae?.trim().toUpperCase() || '',
         endereco: formData.endereco || '',
-        cidade: formData.cidade || '',
+        cidade: formData.cidade || extractCityFromAddress(formData.endereco || ''),
         data_nascimento: formData.data_nascimento || '', 
         updated_at: new Date().toISOString()
       });
@@ -503,6 +526,91 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                         placeholder="Informações adicionais sobre o abordado..."
                       />
                   </div>
+
+                  {(currentUser?.unidade === 'FORÇA TÁTICA' || currentUser?.unidades_extras?.includes('FORÇA TÁTICA') || currentUser?.role === 'MASTER') && (
+                    <div className="space-y-4 pt-4 border-t border-red-100">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-black text-red-600 uppercase tracking-widest">Inteligência / Informações Sigilosas</label>
+                          <button 
+                            type="button"
+                            onClick={() => setShowHistoryModal(true)}
+                            className="text-[10px] font-black text-navy-600 uppercase tracking-widest hover:text-navy-900 transition-colors flex items-center gap-1"
+                          >
+                            <i className="fas fa-history"></i> Ver Registros
+                          </button>
+                        </div>
+                        
+                        {!isAddingConfidential ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingConfidential(true)}
+                            className="w-full bg-red-50 border-2 border-dashed border-red-300 text-red-600 font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                          >
+                            <i className="fas fa-plus-circle"></i> Cadastrar Informação Sigilosa
+                          </button>
+                        ) : (
+                          <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+                            <textarea 
+                              className="w-full bg-white border-2 border-red-500 rounded-2xl px-4 py-3 text-navy-950 outline-none focus:ring-2 focus:ring-red-600 transition-all font-bold min-h-[120px] resize-none text-sm" 
+                              value={newConfidentialText} 
+                              onChange={e => setNewConfidentialText(e.target.value)}
+                              placeholder="Digite a nova informação sigilosa aqui... (Será registrado com seu nome e data atual)"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!newConfidentialText.trim()) return;
+                                  setIsSavingConfidential(true);
+                                  try {
+                                    await addDoc(collection(db, 'confidential_info'), {
+                                      individuo_id: individual.id,
+                                      conteudo: newConfidentialText.trim(),
+                                      operador_nome: currentUser?.nome || 'Operador Desconhecido',
+                                      operador_id: currentUser?.id || '',
+                                      created_at: new Date().toISOString()
+                                    });
+                                    
+                                    await logAction(
+                                      currentUser?.id || 'unknown',
+                                      currentUser?.nome || 'unknown',
+                                      'CREATE_CONFIDENTIAL_INFO',
+                                      `Cadastrou informação sigilosa para o indivíduo ${individual.nome}`,
+                                      { individuo_id: individual.id }
+                                    );
+
+                                    setNewConfidentialText('');
+                                    setIsAddingConfidential(false);
+                                    alert('Informação sigilosa registrada com sucesso!');
+                                  } catch (err) {
+                                    console.error("Erro ao salvar info sigilosa:", err);
+                                    handleFirestoreError(err, OperationType.WRITE, 'confidential_info');
+                                  } finally {
+                                    setIsSavingConfidential(false);
+                                  }
+                                }}
+                                disabled={isSavingConfidential || !newConfidentialText.trim()}
+                                className="flex-1 bg-red-600 text-white font-black py-3 rounded-xl uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all disabled:opacity-50"
+                              >
+                                {isSavingConfidential ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
+                                Salvar Registro
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsAddingConfidential(false);
+                                  setNewConfidentialText('');
+                                }}
+                                className="px-6 bg-gray-200 text-navy-600 font-black py-3 rounded-xl uppercase text-[10px] tracking-widest hover:bg-gray-300 transition-all"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  )}
                 </div>
 
                 {isEditing && (
@@ -588,12 +696,14 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                 </div>
                 </div>
 
-                <div className="flex gap-3 pt-4 border-t border-navy-100 sticky bottom-0 bg-white pb-2">
-                <button type="button" onClick={onClose} className="flex-1 bg-navy-50 text-navy-900 font-black py-3 rounded-xl uppercase text-xs hover:bg-navy-100 transition-colors border border-navy-100">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="flex-1 bg-navy-900 text-white font-black py-3 rounded-xl uppercase text-xs hover:bg-navy-800 transition-colors shadow-lg shadow-navy-900/20">
-                    {isSaving ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>} Salvar Alterações
-                </button>
-                </div>
+                {isEditing && (
+                  <div className="flex gap-3 pt-4 border-t border-navy-100 sticky bottom-0 bg-white pb-2">
+                    <button type="button" onClick={() => { setIsEditing(false); setFormData({...individual}); }} className="flex-1 bg-navy-50 text-navy-900 font-black py-3 rounded-xl uppercase text-xs hover:bg-navy-100 transition-colors border border-navy-100">Cancelar</button>
+                    <button type="submit" disabled={isSaving} className="flex-1 bg-navy-900 text-white font-black py-3 rounded-xl uppercase text-xs hover:bg-navy-800 transition-colors shadow-lg shadow-navy-900/20">
+                        {isSaving ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>} Salvar Alterações
+                    </button>
+                  </div>
+                )}
             </form>
           </div>
         </div>
@@ -667,6 +777,13 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
             </div>
           </div>
         </div>
+      )}
+      {showHistoryModal && (
+        <ConfidentialHistoryModal 
+          individualId={individual.id}
+          individualNome={individual.nome}
+          onClose={() => setShowHistoryModal(false)}
+        />
       )}
     </>
   );

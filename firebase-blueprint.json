@@ -422,6 +422,35 @@
         }
       },
       "required": ["individuo_id", "relacionado_id", "tipo"]
+    },
+    "ConfidentialInfo": {
+      "title": "ConfidentialInfo",
+      "description": "Historical classified information for an individual",
+      "type": "object",
+      "properties": {
+        "individuo_id": {
+          "type": "string",
+          "description": "Reference to the individual"
+        },
+        "conteudo": {
+          "type": "string",
+          "description": "Confidential content"
+        },
+        "operador_nome": {
+          "type": "string",
+          "description": "Name of the operator who recorded it"
+        },
+        "operador_id": {
+          "type": "string",
+          "description": "ID of the operator who recorded it"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["individuo_id", "conteudo", "operador_nome", "operador_id", "created_at"]
     }
   },
   "firestore": {
@@ -472,6 +501,10 @@
     "/system_versions/{versionId}": {
       "schema": "SystemVersion",
       "description": "System version history"
+    },
+    "/confidential_info/{infoId}": {
+      "schema": "ConfidentialInfo",
+      "description": "Historical classified information"
     }
   }
 }

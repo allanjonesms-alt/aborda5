@@ -130,8 +130,8 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
       if (activeFilter !== 'TODOS') {
         if (activeFilter === 'OUTROS') {
           filtered = filtered.filter(item => !allowedCities.some(city => item.endereco?.toUpperCase().includes(city)));
-        } else if (activeFilter === '2ª CIA/RIO VERDE') {
-          filtered = filtered.filter(item => RIO_VERDE_VARIATIONS.some(v => item.endereco?.toUpperCase().includes(v)));
+        } else if (activeFilter === 'RIO VERDE') {
+          filtered = filtered.filter(item => RIO_VERDE_VARIATIONS.some(v => item.endereco?.toUpperCase().includes(v.toUpperCase())));
         } else {
           filtered = filtered.filter(item => item.endereco?.toUpperCase().includes(activeFilter));
         }

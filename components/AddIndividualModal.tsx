@@ -56,6 +56,10 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
   const [isSaving, setIsSaving] = useState(false);
   const [cpfError, setCpfError] = useState(false);
   
+  const [isAddingConfidential, setIsAddingConfidential] = useState(false);
+  const [newConfidentialText, setNewConfidentialText] = useState('');
+  const [tempConfidentialRecords, setTempConfidentialRecords] = useState<{conteudo: string, created_at: string}[]>([]);
+  
   // Estados para Homônimos e CPF Duplicado
   const [homonyms, setHomonyms] = useState<any[]>([]);
   const [showHomonymAlert, setShowHomonymAlert] = useState(false);
@@ -234,6 +238,17 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
       });
 
       await batch.commit();
+
+      // 4. Salvar Informações Sigilosas
+      for (const record of tempConfidentialRecords) {
+        await addDoc(collection(db, 'confidential_info'), {
+          individuo_id: indRef.id,
+          conteudo: record.conteudo,
+          operador_nome: currentUser?.nome || 'Operador Desconhecido',
+          operador_id: currentUser?.id || '',
+          created_at: record.created_at
+        });
+      }
 
       await logAction(
         currentUser?.id || '',
@@ -446,6 +461,84 @@ const AddIndividualModal: React.FC<AddIndividualModalProps> = ({ currentUser, on
                   onChange={e => setFormData({...formData, observacao: e.target.value})}
                 />
               </div>
+
+              {(currentUser?.unidade === 'FORÇA TÁTICA' || currentUser?.unidades_extras?.includes('FORÇA TÁTICA') || currentUser?.role === 'MASTER') && (
+                <div className="md:col-span-3 space-y-4 pt-4 border-t border-red-100">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-black text-red-600 uppercase tracking-widest">Inteligência / Informações Sigilosas</label>
+                      {tempConfidentialRecords.length > 0 && (
+                        <span className="text-[10px] font-black text-navy-600 uppercase tracking-widest">
+                          {tempConfidentialRecords.length} registro(s) pendente(s)
+                        </span>
+                      )}
+                    </div>
+                    
+                    {!isAddingConfidential ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingConfidential(true)}
+                        className="w-full bg-red-50 border-2 border-dashed border-red-300 text-red-600 font-black py-4 rounded-2xl uppercase text-xs tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                      >
+                        <i className="fas fa-plus-circle"></i> Cadastrar Informação Sigilosa
+                      </button>
+                    ) : (
+                      <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+                        <textarea 
+                          className="w-full bg-white border-2 border-red-500 rounded-2xl px-4 py-3 text-navy-950 outline-none focus:ring-2 focus:ring-red-600 transition-all font-bold min-h-[120px] resize-none text-sm" 
+                          value={newConfidentialText} 
+                          onChange={e => setNewConfidentialText(e.target.value)}
+                          placeholder="Digite a nova informação sigilosa aqui... (Será registrado com seu nome e data atual)"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newConfidentialText.trim()) return;
+                              setTempConfidentialRecords([...tempConfidentialRecords, {
+                                conteudo: newConfidentialText.trim(),
+                                created_at: new Date().toISOString()
+                              }]);
+                              setNewConfidentialText('');
+                              setIsAddingConfidential(false);
+                            }}
+                            className="flex-1 bg-red-600 text-white font-black py-3 rounded-xl uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all"
+                          >
+                            <i className="fas fa-check mr-2"></i>
+                            Adicionar ao Cadastro
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingConfidential(false);
+                              setNewConfidentialText('');
+                            }}
+                            className="px-6 bg-gray-200 text-navy-600 font-black py-3 rounded-xl uppercase text-[10px] tracking-widest hover:bg-gray-300 transition-all"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {tempConfidentialRecords.length > 0 && (
+                      <div className="space-y-2">
+                        {tempConfidentialRecords.map((rec, idx) => (
+                          <div key={idx} className="bg-red-50 border border-red-100 rounded-xl p-3 flex justify-between items-start">
+                            <p className="text-xs text-navy-900 font-bold line-clamp-2">{rec.conteudo}</p>
+                            <button 
+                              type="button"
+                              onClick={() => setTempConfidentialRecords(tempConfidentialRecords.filter((_, i) => i !== idx))}
+                              className="text-red-400 hover:text-red-600"
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+              )}
             </div>
 
             <RelationshipSection 

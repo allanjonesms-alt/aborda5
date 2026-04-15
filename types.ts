@@ -55,6 +55,15 @@ export interface Individual {
   fotos_individuos?: PhotoRecord[];
 }
 
+export interface ConfidentialInfo {
+  id: string;
+  individuo_id: string;
+  conteudo: string;
+  operador_nome: string;
+  operador_id: string;
+  created_at: string;
+}
+
 export interface Relationship {
   id: string;
   individuo_id: string;
