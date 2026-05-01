@@ -100,6 +100,7 @@ export interface DBApproach {
   criado_por?: string;
   created_at?: string;
   foto_path?: string;
+  is_saw?: boolean;
 }
 
 export interface Unit {
@@ -116,6 +117,39 @@ export interface SystemVersion {
   description: string;
   date: string;
   created_at?: any;
+}
+
+export enum CrimeType {
+  DRUGS = 'DROGAS',
+  WEAPONS = 'ARMAS',
+  ROBBERY = 'ROUBOS'
+}
+
+export enum CrimeMemberRole {
+  DISTRIBUIDOR = 'DISTRIBUIDOR',
+  BOCA_DE_FUMO = 'BOCA_DE_FUMO',
+  VAPOR = 'VAPOR',
+  USUARIO = 'USUARIO'
+}
+
+export interface CrimeGroup {
+  id: string;
+  nome: string;
+  cidade: string;
+  tipo: CrimeType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrimeMember {
+  id: string;
+  group_id: string;
+  individual_id: string;
+  role: CrimeMemberRole;
+  parent_id?: string; // For hierarchy
+  drugs?: string[]; // MACONHA, COCAINA, HAXIXE, CRACK, ECSTASY, OUTROS
+  funcao_especifica?: string;
+  created_at: string;
 }
 
 export interface AuthState {

@@ -23,6 +23,8 @@ import UserManual from './pages/UserManual';
 import Occurrences from './pages/Occurrences';
 import Statistics from './pages/Statistics';
 import SystemVersions from './pages/SystemVersions';
+import CrimeGroupsList from './pages/CrimeGroupsList';
+import CrimeOrganogram from './pages/CrimeOrganogram';
 import { auth as firebaseAuth, logAction } from './firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
@@ -235,6 +237,8 @@ const App: React.FC = () => {
             <Route path="/logs" element={<Logs user={auth.user} />} />
             <Route path="/versoes" element={<SystemVersions user={auth.user} />} />
             <Route path="/manual" element={<UserManual />} />
+            <Route path="/organogramas" element={auth.user?.role === UserRole.MASTER ? <CrimeGroupsList user={auth.user} /> : <Navigate to="/" replace />} />
+            <Route path="/organograma/:groupId" element={auth.user?.role === UserRole.MASTER ? <CrimeOrganogram user={auth.user} /> : <Navigate to="/" replace />} />
             <Route path="/ocorrencias" element={(auth.user?.role === UserRole.ADMIN || auth.user?.role === UserRole.MASTER) ? <Occurrences user={auth.user} /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

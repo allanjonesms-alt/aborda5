@@ -8,6 +8,7 @@ import { loadGoogleMaps } from '../lib/googleMaps';
 import RelationshipSection from './RelationshipSection';
 import ManagePhotosModal from './ManagePhotosModal';
 import ConfidentialHistoryModal from './ConfidentialHistoryModal';
+import SawModal from './SawModal';
 
 interface AttachmentViewerModalProps {
   attachment: Attachment;
@@ -93,6 +94,7 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
   const [cpfError, setCpfError] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
+  const [isSawModalOpen, setIsSawModalOpen] = useState(false);
   
   const photos = individual.fotos_individuos || [];
   const initialIndex = photos.findIndex(p => p.is_primary);
@@ -406,9 +408,18 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
             </div>
             <div className="flex items-center gap-3">
               {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="text-navy-600 hover:text-navy-900 transition-colors font-black uppercase text-xs">
-                  <i className="fas fa-edit mr-2"></i> Editar
-                </button>
+                <>
+                  <button 
+                    onClick={() => setIsSawModalOpen(true)} 
+                    className="bg-navy-900 hover:bg-navy-800 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-navy-900/20"
+                    title="Registrar Visualização (SAW)"
+                  >
+                    <i className="fas fa-eye"></i>
+                  </button>
+                  <button onClick={() => setIsEditing(true)} className="text-navy-600 hover:text-navy-900 transition-colors font-black uppercase text-xs">
+                    <i className="fas fa-edit mr-2"></i> Editar
+                  </button>
+                </>
               )}
               <button onClick={onClose} className="text-navy-400 hover:text-navy-900 transition-colors"><i className="fas fa-times text-xl"></i></button>
             </div>
@@ -671,10 +682,10 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
                 </div>
                 <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
                     {approachesHistory.map(app => (
-                    <div key={app.id} className="bg-navy-50 border border-navy-100 rounded-lg p-3 flex flex-col gap-1.5 hover:bg-navy-100 transition-colors">
+                    <div key={app.id} className={`bg-navy-50 border ${app.is_saw ? 'border-forest-500/30 bg-forest-50/30' : 'border-navy-100'} rounded-lg p-3 flex flex-col gap-1.5 hover:bg-navy-100 transition-colors`}>
                         <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <i className="fas fa-history text-navy-600 text-[10px]"></i>
+                            <i className={`fas ${app.is_saw ? 'fa-eye text-forest-600' : 'fa-history text-navy-600'} text-[10px]`}></i>
                             <span className="text-[10px] text-navy-900 font-black uppercase tracking-tighter">
                             {new Date(app.data).toLocaleDateString('pt-BR')} às {app.horario}
                             </span>
@@ -720,6 +731,15 @@ const EditIndividualModal: React.FC<EditIndividualModalProps> = ({ individual, o
             onSave(formData); // Trigger refresh
           }}
           currentUser={currentUser}
+        />
+      )}
+
+      {isSawModalOpen && (
+        <SawModal 
+          user={currentUser}
+          individual={individual}
+          onClose={() => setIsSawModalOpen(false)}
+          onSaved={fetchApproachesHistory}
         />
       )}
 

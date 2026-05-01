@@ -2,12 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole, Shift } from '../types';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Eye, Network } from 'lucide-react';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import ChangePasswordModal from './ChangePasswordModal';
 import StartShiftModal from './StartShiftModal';
 import TacticalLogo from './TacticalLogo';
+import SawModal from './SawModal';
 
 interface HeaderProps {
   user: User | null;
@@ -21,6 +22,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
   const [activeShifts, setActiveShifts] = useState<Shift[]>([]);
   const [isStartShiftModalOpen, setIsStartShiftModalOpen] = useState(false);
   const [showEndShiftConfirm, setShowEndShiftConfirm] = useState(false);
+  const [isSawModalOpen, setIsSawModalOpen] = useState(false);
 
   const [isEndingShift, setIsEndingShift] = useState(false);
 
@@ -121,6 +123,54 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
 
   const isHome = location.pathname === '/';
 
+  const NavIcons = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className={`flex items-center ${isMobile ? 'justify-around w-full' : 'space-x-1 sm:space-x-2'}`}>
+      <Link 
+        to="/" 
+        className={`p-3 sm:p-2 rounded-xl transition-all flex items-center justify-center ${isHome ? 'bg-navy-900 text-white sm:bg-navy-900/10 sm:text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
+        title="Início"
+      >
+        <i className="fas fa-home text-lg sm:text-lg"></i>
+      </Link>
+
+      <Link 
+        to="/manual" 
+        className={`p-3 sm:p-2 rounded-xl transition-all flex items-center justify-center ${location.pathname === '/manual' ? 'bg-navy-900 text-white sm:bg-navy-900/10 sm:text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
+        title="Manual do Usuário"
+      >
+        <BookOpen size={isMobile ? 22 : 18} />
+      </Link>
+
+      <button 
+        onClick={() => setIsSawModalOpen(true)}
+        className="p-3 sm:p-2 rounded-xl transition-all flex items-center justify-center text-navy-400 hover:bg-navy-50 hover:text-navy-900"
+        title="Registro Rápido SAW"
+      >
+        <Eye size={isMobile ? 22 : 18} />
+      </button>
+
+      {user?.role === UserRole.MASTER && (
+        <Link 
+          to="/organogramas" 
+          className={`p-3 sm:p-2 rounded-xl transition-all flex items-center justify-center ${location.pathname.startsWith('/organograma') ? 'bg-navy-900 text-white sm:bg-navy-900/10 sm:text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
+          title="Organograma do Crime"
+        >
+          <Network size={isMobile ? 22 : 18} />
+        </Link>
+      )}
+
+      {(user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) && (
+        <Link 
+          to="/configuracoes" 
+          className={`p-3 sm:p-2 rounded-xl transition-all flex items-center justify-center ${location.pathname === '/configuracoes' ? 'bg-navy-900 text-white sm:bg-navy-900/10 sm:text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
+          title="Configurações"
+        >
+          <i className="fas fa-cog text-lg sm:text-lg"></i>
+        </Link>
+      )}
+    </div>
+  );
+
   return (
     <>
       <header className="bg-white border-b border-navy-100 p-2 sm:p-4 sticky top-0 z-50 shadow-sm">
@@ -140,7 +190,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
             </Link>
           </div>
 
-          <div className="flex items-center space-x-1 sm:space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {activeShifts.length > 0 ? (
               <div className="flex items-center bg-navy-50 rounded-xl border border-navy-100 px-2 sm:px-3 py-1.5 gap-2 sm:gap-3">
                 <div className="flex flex-col items-end hidden sm:flex">
@@ -169,31 +219,10 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
               </button>
             )}
 
-            <div className="h-8 w-px bg-navy-100 mx-1"></div>
-
-            <Link 
-              to="/" 
-              className={`p-2 rounded-lg transition-all flex items-center justify-center ${isHome ? 'bg-navy-900/10 text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
-            >
-              <i className="fas fa-home text-base sm:text-lg"></i>
-            </Link>
-
-            <Link 
-              to="/manual" 
-              className={`p-2 rounded-lg transition-all flex items-center justify-center ${location.pathname === '/manual' ? 'bg-navy-900/10 text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
-              title="Manual do Usuário"
-            >
-              <BookOpen size={18} />
-            </Link>
-
-            {(user?.role === UserRole.ADMIN || user?.role === UserRole.MASTER) && (
-              <Link 
-                to="/configuracoes" 
-                className={`p-2 rounded-lg transition-all flex items-center justify-center ${location.pathname === '/configuracoes' ? 'bg-navy-900/10 text-navy-900' : 'text-navy-400 hover:bg-navy-50 hover:text-navy-900'}`}
-              >
-                <i className="fas fa-cog text-base sm:text-lg"></i>
-              </Link>
-            )}
+            <div className="hidden sm:flex items-center space-x-2">
+              <div className="h-8 w-px bg-navy-100 mx-2"></div>
+              <NavIcons />
+            </div>
 
             <button 
               onClick={onLogout}
@@ -204,6 +233,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </div>
         </div>
       </header>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="sm:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-sm">
+        <div className="bg-white/80 backdrop-blur-lg border border-navy-100 p-2 rounded-[2rem] shadow-2xl flex items-center justify-around">
+          <NavIcons isMobile />
+        </div>
+      </nav>
 
       {isStartShiftModalOpen && (
         <StartShiftModal 
@@ -217,6 +253,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
         <ChangePasswordModal 
           user={user} 
           onClose={() => setIsPasswordModalOpen(false)} 
+        />
+      )}
+
+      {isSawModalOpen && (
+        <SawModal 
+          user={user}
+          onClose={() => setIsSawModalOpen(false)}
+          onSaved={() => {}}
         />
       )}
 

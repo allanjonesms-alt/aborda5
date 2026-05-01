@@ -263,6 +263,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             description="Visualização geográfica de ocorrências e endereços."
           />
         )}
+        {user?.role === UserRole.MASTER && (
+          <MenuButton
+            to="/organogramas"
+            icon="fa-network-wired"
+            label="Organograma"
+            colorClass="bg-red-800"
+            description="Estrutura de grupos criminosos."
+          />
+        )}
         {isFeatureEnabled('estatisticas') && (
           <MenuButton
             to="/estatisticas"

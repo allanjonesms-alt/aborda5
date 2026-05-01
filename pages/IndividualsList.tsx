@@ -83,7 +83,7 @@ const IndividualCard = memo(({ ind, onEdit, onManagePhotos }: {
 
 const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   const [individuals, setIndividuals] = useState<Individual[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -92,6 +92,7 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   const [managingPhotosIndividual, setManagingPhotosIndividual] = useState<Individual | null>(null);
   const [isAddingIndividual, setIsAddingIndividual] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   
   const lastDocRef = useRef<any>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -118,15 +119,23 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
 
   const setActiveFilterAndReset = (city: string) => {
     setActiveFilter(city);
+    setHasSearched(true);
     lastDocRef.current = null; // Reset pagination
     setIndividuals([]); // Clear current list
     setIsLoading(true); // Show loading state
   };
 
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedSearch(search), 400);
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      if (search.trim() !== '') setHasSearched(true);
+    }, 400);
     return () => clearTimeout(handler);
   }, [search]);
+
+  useEffect(() => {
+    if (factionFilter !== '') setHasSearched(true);
+  }, [factionFilter]);
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastElementRef = useCallback((node: HTMLDivElement) => {
@@ -286,8 +295,10 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
   }, [user, activeFilter, debouncedSearch, factionFilter]);
 
   useEffect(() => {
-    fetchIndividuals(true, debouncedSearch, factionFilter);
-  }, [debouncedSearch, factionFilter, activeFilter]);
+    if (hasSearched) {
+      fetchIndividuals(true, debouncedSearch, factionFilter);
+    }
+  }, [debouncedSearch, factionFilter, activeFilter, hasSearched]);
 
   const handleSave = () => {
     setIndividuals([]);
@@ -371,9 +382,17 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
               Tentar Novamente
             </button>
           </div>
+        ) : !hasSearched ? (
+          <div className="col-span-full py-20 text-center bg-navy-50/50 rounded-3xl border border-dashed border-navy-200">
+            <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-navy-100">
+              <i className="fas fa-search text-navy-200 text-2xl"></i>
+            </div>
+            <p className="text-navy-400 font-black uppercase text-[10px] tracking-widest">Utilize o campo de busca ou filtros acima</p>
+            <p className="text-navy-300 font-bold text-[9px] uppercase mt-2">Para consultar registros de indivíduos</p>
+          </div>
         ) : isLoading && individuals.length === 0 ? (
           Array.from({ length: 12 }).map((_, i) => <IndividualSkeleton key={i} />)
-        ) : (
+        ) : individuals.length > 0 ? (
           <>
             {individuals.map((ind, index) => (
               <div key={ind.id} ref={index === individuals.length - 1 ? lastElementRef : null}>
@@ -382,6 +401,14 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
             ))}
             {isLoadingMore && Array.from({ length: 6 }).map((_, i) => <IndividualSkeleton key={i} />)}
           </>
+        ) : (
+          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-navy-100">
+            <div className="bg-navy-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-user-slash text-navy-200 text-2xl"></i>
+            </div>
+            <p className="text-navy-400 font-black uppercase text-xs tracking-widest">Nenhum indivíduo encontrado</p>
+            <p className="text-navy-300 font-bold text-[10px] uppercase mt-2">Tente ajustar seus filtros de busca</p>
+          </div>
         )}
       </div>
 

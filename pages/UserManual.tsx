@@ -2,7 +2,7 @@
 import React, { useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { FileText, Download, ChevronRight, Info, Shield, UserPlus, Camera, Map as MapIcon, History, MapPin, Calendar, Clock, Edit3, FileDigit, Plus, Search, Trash2 } from 'lucide-react';
+import { FileText, Download, ChevronRight, Info, Shield, UserPlus, Camera, Map as MapIcon, History, MapPin, Calendar, Clock, Edit3, FileDigit, Plus, Search, Trash2, Eye } from 'lucide-react';
 
 const UserManual: React.FC = () => {
   const manualRef = useRef<HTMLDivElement>(null);
@@ -203,6 +203,21 @@ const UserManual: React.FC = () => {
               <li className="flex gap-3"><ChevronRight size={14} className="mt-1 flex-shrink-0" /> Descreva o Relatório da ocorrência e Objetos Apreendidos (se houver).</li>
               <li className="flex gap-3"><ChevronRight size={14} className="mt-1 flex-shrink-0" /> Salve o registro para disponibilizá-lo imediatamente na rede.</li>
             </ol>
+          </div>
+
+          <div className="bg-navy-900 p-6 rounded-3xl border border-navy-800 space-y-4">
+            <h4 className="text-white font-black text-xs uppercase mb-2 flex items-center gap-2">
+              <Eye size={16} /> Registro Rápido SAW (Visualização)
+            </h4>
+            <p className="text-xs text-navy-200 leading-relaxed">
+              A função <strong>SAW (Sistema de Abordagem Rápida)</strong> permite registrar a visualização de um indivíduo sem a necessidade de uma abordagem física ou relatório detalhado.
+            </p>
+            <ul className="text-xs text-navy-200 space-y-2 list-disc list-inside">
+              <li>Acesse pelo ícone de <strong>Olho</strong> <Eye size={12} className="inline" /> no menu superior ou no perfil do indivíduo.</li>
+              <li>O sistema captura automaticamente o local e horário atual.</li>
+              <li>Estes registros aparecem no histórico com um ícone de olho azul, diferenciando-os de abordagens completas.</li>
+              <li>Ideal para monitoramento de alvos em movimento ou locais de aglomeração.</li>
+            </ul>
           </div>
         </section>
 

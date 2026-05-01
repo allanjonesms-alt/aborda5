@@ -4,7 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, getDoc } from 'firebase/firestore';
 import { Individual, User, UserRole } from '../types';
 import EditIndividualModal from '../components/EditIndividualModal';
-import { allowedCities, RIO_VERDE_VARIATIONS, checkIsAdmin } from '../lib/utils';
+import { allowedCities, checkIsAdmin, extractCityFromAddress } from '../lib/utils';
 
 const ITEMS_PER_PAGE = 18;
 
@@ -17,7 +17,7 @@ interface IndividualWithPhoto extends Partial<Individual> {
 }
 
 const GallerySkeleton = () => (
-  <div className="aspect-[3/4] bg-gray-50 border border-navy-100 rounded-3xl animate-pulse"></div>
+  <div className="aspect-[3/4] bg-gray-50 border border-navy-100 rounded-2xl animate-pulse"></div>
 );
 
 interface GalleryProps {
@@ -34,7 +34,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
   // Find the matching city from allowedCities by normalizing both
   const matchedCity = allowedCities.find(city => {
     const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
-    const isMatch = normalizedCity.includes(userCity) || (userCity.includes('RIOVERDE') && normalizedCity === '2ªCIARIOVERDE');
+    const isMatch = normalizedCity.includes(userCity) || (userCity.includes('RIOVERDE') && normalizedCity === 'RIOVERDE');
     return isMatch;
   });
 
@@ -128,13 +128,34 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
       let filtered = formattedData.filter(item => item.fotos_individuos.length > 0);
       
       if (activeFilter !== 'TODOS') {
-        if (activeFilter === 'OUTROS') {
-          filtered = filtered.filter(item => !allowedCities.some(city => item.endereco?.toUpperCase().includes(city)));
-        } else if (activeFilter === 'RIO VERDE') {
-          filtered = filtered.filter(item => RIO_VERDE_VARIATIONS.some(v => item.endereco?.toUpperCase().includes(v.toUpperCase())));
-        } else {
-          filtered = filtered.filter(item => item.endereco?.toUpperCase().includes(activeFilter));
-        }
+        filtered = filtered.filter(ind => {
+          const cityFromAddress = extractCityFromAddress(ind.endereco || '');
+          const cityFromField = ind.cidade || '';
+          
+          // Normaliza o filtro ativo para comparação
+          const normalizedActiveFilter = activeFilter.toUpperCase().replace(/[\s/]+/g, '');
+          
+          const checkCity = (city: string) => {
+            if (!city) return false;
+            const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
+            
+            // Trata o código 79480 como Rio Verde
+            if (normalizedCity === '79480') return normalizedActiveFilter.includes('RIOVERDE');
+            
+            // Compara com o filtro ativo
+            return normalizedCity === normalizedActiveFilter || (normalizedActiveFilter.includes('RIOVERDE') && normalizedCity.includes('RIOVERDE'));
+          };
+
+          if (activeFilter === 'OUTROS') {
+            const isKnownCity = allowedCities.some(city => {
+              const norm = city.toUpperCase().replace(/[\s/]+/g, '');
+              return checkCity(cityFromAddress) || checkCity(cityFromField);
+            });
+            return !isKnownCity;
+          }
+
+          return checkCity(cityFromAddress) || checkCity(cityFromField);
+        });
       }
 
       setData(prev => isInitial ? filtered : [...prev, ...filtered]);
@@ -205,7 +226,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-9 gap-3 sm:gap-4">
         {isLoading && data.length === 0 ? (
           Array.from({ length: 12 }).map((_, i) => <GallerySkeleton key={i} />)
         ) : (
@@ -215,7 +236,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
                 key={item.id} 
                 ref={index === data.length - 1 ? lastElementRef : null}
                 onClick={() => handleOpenProfile(item.id!)}
-                className="group relative aspect-[3/4] rounded-3xl border border-navy-100 overflow-hidden bg-white shadow-lg hover:border-forest-500/50 hover:scale-[1.03] cursor-pointer transition-all active:scale-95"
+                className="group relative aspect-[3/4] rounded-2xl border border-navy-100 overflow-hidden bg-white shadow-lg hover:border-forest-500/50 hover:scale-[1.03] cursor-pointer transition-all active:scale-95"
               >
                 <img 
                   src={item.fotos_individuos[0]?.path} 
@@ -224,7 +245,7 @@ const Gallery: React.FC<GalleryProps> = ({ user }) => {
                   alt={item.nome}
                 />
                 
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/20 to-transparent p-4 flex flex-col justify-end">
+                <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/20 to-transparent p-2 sm:p-3 flex flex-col justify-end">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <h4 className="text-white text-[9px] font-black uppercase tracking-tight truncate leading-tight group-hover:text-forest-400 transition-colors">
                       {item.nome}

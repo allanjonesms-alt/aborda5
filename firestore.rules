@@ -185,8 +185,9 @@ service cloud.firestore {
     }
 
     function isValidApproach(data) {
-      return hasOnlyAllowedFields(['data', 'horario', 'local', 'relatorio', 'objetos_apreendidos', 'resultado', 'individuo_nome', 'individuo_id', 'foto_path', 'unidade', 'criado_por', 'created_at', 'updated_at']) &&
-             data.data is string && data.horario is string && data.local is string;
+      return hasOnlyAllowedFields(['data', 'horario', 'local', 'relatorio', 'objetos_apreendidos', 'resultado', 'individuo_nome', 'individuo_id', 'foto_path', 'unidade', 'criado_por', 'created_at', 'updated_at', 'is_saw']) &&
+             data.data is string && data.horario is string && data.local is string &&
+             (!('is_saw' in data) || data.is_saw is bool);
     }
 
     function isValidVtrService(data) {
@@ -210,6 +211,20 @@ service cloud.firestore {
       return hasOnlyAllowedFields(['individuo_id', 'conteudo', 'operador_nome', 'operador_id', 'created_at']) &&
              data.individuo_id is string && data.conteudo is string && data.conteudo.size() > 0 &&
              data.operador_nome is string && data.operador_id is string && data.created_at is string;
+    }
+
+    function isValidCrimeGroup(data) {
+      return hasOnlyAllowedFields(['nome', 'cidade', 'tipo', 'created_at', 'updated_at']) &&
+             data.nome is string && data.cidade is string && data.tipo in ['DROGAS', 'ARMAS', 'ROUBOS'] &&
+             data.created_at is string && data.updated_at is string;
+    }
+
+    function isValidCrimeMember(data) {
+      return hasOnlyAllowedFields(['group_id', 'individual_id', 'role', 'parent_id', 'drugs', 'funcao_especifica', 'created_at']) &&
+             data.group_id is string && data.individual_id is string &&
+             data.role in ['DISTRIBUIDOR', 'BOCA_DE_FUMO', 'VAPOR', 'USUARIO'] &&
+             (!('drugs' in data) || data.drugs is list) &&
+             data.created_at is string;
     }
 
     // ===============================================================
@@ -291,6 +306,16 @@ service cloud.firestore {
     match /logs/{logId} {
       allow read: if isAdmin();
       allow create: if isAuthenticated();
+    }
+
+    match /crime_groups/{groupId} {
+      allow read: if isAuthenticated() && isMaster();
+      allow write: if isAuthenticated() && isMaster() && isValidCrimeGroup(request.resource.data);
+    }
+
+    match /crime_members/{memberId} {
+      allow read: if isAuthenticated() && isMaster();
+      allow write: if isAuthenticated() && isMaster() && isValidCrimeMember(request.resource.data);
     }
 
     // Default deny

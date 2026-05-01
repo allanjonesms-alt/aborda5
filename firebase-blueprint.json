@@ -214,6 +214,10 @@
           "type": "string",
           "format": "date-time",
           "description": "Creation timestamp"
+        },
+        "is_saw": {
+          "type": "boolean",
+          "description": "Whether this is a quick sighting (SAW) record"
         }
       },
       "required": ["data", "horario", "local"]
@@ -451,6 +455,34 @@
         }
       },
       "required": ["individuo_id", "conteudo", "operador_nome", "operador_id", "created_at"]
+    },
+    "CrimeGroup": {
+      "title": "CrimeGroup",
+      "description": "Criminal group/faction in a city",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "cidade": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["DROGAS", "ARMAS", "ROUBOS"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["nome", "cidade", "tipo"]
+    },
+    "CrimeMember": {
+      "title": "CrimeMember",
+      "description": "Member of a crime organogram",
+      "type": "object",
+      "properties": {
+        "group_id": { "type": "string" },
+        "individual_id": { "type": "string" },
+        "role": { "type": "string", "enum": ["DISTRIBUIDOR", "BOCA_DE_FUMO", "VAPOR", "USUARIO"] },
+        "parent_id": { "type": "string" },
+        "drugs": { "type": "array", "items": { "type": "string" } },
+        "funcao_especifica": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["group_id", "individual_id", "role"]
     }
   },
   "firestore": {
@@ -505,6 +537,14 @@
     "/confidential_info/{infoId}": {
       "schema": "ConfidentialInfo",
       "description": "Historical classified information"
+    },
+    "/crime_groups/{groupId}": {
+      "schema": "CrimeGroup",
+      "description": "Criminal groups"
+    },
+    "/crime_members/{memberId}": {
+      "schema": "CrimeMember",
+      "description": "Members of criminal organograms"
     }
   }
 }
