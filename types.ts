@@ -173,6 +173,7 @@ export interface OccurrenceSS {
   tipo_ss: 'Rondas' | 'Policiamento em evento' | 'Policiamento Medidas Protetivas' | 'Atendimento de Chamada';
   gu_servico: string[];
   unidade?: string;
+  cidade?: string;
   criado_por: string;
   created_at: string;
   date?: string;
@@ -180,6 +181,7 @@ export interface OccurrenceSS {
   facts?: string;
   personnel?: string;
   eventoComunicado?: string;
+  roAddress?: string;
 }
 
 export interface OccurrenceRO {
@@ -187,8 +189,10 @@ export interface OccurrenceRO {
   nr_ro: string;
   fato: string | string[];
   unidade?: string;
+  cidade?: string;
   criado_por: string;
   created_at: string;
+  gu_servico?: string[];
   roData?: string[];
   roAddress?: string;
   date?: string;

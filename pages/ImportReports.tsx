@@ -56,7 +56,7 @@ const ImportReports: React.FC<ImportReportsProps> = ({ user }) => {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Extract the following information from each of the provided reports and return as a JSON array of objects with these exact keys: "ssNumber" (10 digits), "date", "time", "facts", "personnel", "eventoComunicado" (the event description), "roData" (if "DADOS DO RO" is present in the report, extract the list of events listed after it as an array of strings; otherwise set to null), and "roAddress" (if "DADOS DO RO" is present, extract the address and format it as: "RUA [STREET], [NUMBER] - [NEIGHBORHOOD] - [CITY]"; otherwise set to null).
+        contents: `Extract the following information from each of the provided reports and return as a JSON array of objects with these exact keys: "ssNumber" (10 digits), "date", "time", "facts", "personnel", "eventoComunicado" (the event description), "roData" (if "DADOS DO RO" is present in the report, extract the list of events listed after it as an array of strings; otherwise set to null), and "roAddress" (extract the occurrence address and format it as: "RUA [STREET], [NUMBER] - [NEIGHBORHOOD] - [CITY]". Always try to find the address, it might be near the start or in sections like "LOCAL DA OCORRÊNCIA").
         
         Reports: ${JSON.stringify(reports)}`,
         config: {
@@ -114,6 +114,12 @@ const ImportReports: React.FC<ImportReportsProps> = ({ user }) => {
         nr_ss: ssNumber,
         tipo_ss: 'Atendimento de Chamada', // Default type
         gu_servico: [], // Default empty
+        date: report.date,
+        time: report.time,
+        facts: report.facts,
+        personnel: report.personnel,
+        eventoComunicado: report.eventoComunicado,
+        roAddress: report.roAddress,
         unidade: user?.unidade,
         criado_por: user?.nome,
         created_at: new Date().toISOString()

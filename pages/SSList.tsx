@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { FileDigit, X, Plus, CheckCircle2, Trash2, ClipboardList, Edit2 } from 'lucide-react';
+import { FileDigit, X, Plus, CheckCircle2, Trash2, ClipboardList, Edit2, MapPin } from 'lucide-react';
 import { User, OccurrenceSS } from '../types';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, addDoc, getDocs, query, orderBy, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import TacticalAlert from '../components/TacticalAlert';
+import { allowedCities, checkIsAdmin } from '../lib/utils';
 
 interface SSListProps {
   user: User | null;
@@ -17,9 +18,24 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
   const [occurrencesSS, setOccurrencesSS] = useState<OccurrenceSS[]>([]);
   const [ssToDelete, setSsToDelete] = useState<{ id: string, nr: string } | null>(null);
   
+  const isAdmin = checkIsAdmin(user);
+  const userCity = user?.unidade?.toUpperCase().replace(/[\s/]+/g, '') || '';
+  const matchedCity = allowedCities.find(city => {
+    const normalizedCity = city.toUpperCase().replace(/[\s/]+/g, '');
+    return userCity.includes(normalizedCity) || (userCity.includes('RIOVERDE') && normalizedCity === 'RIOVERDE');
+  });
+
+  // Priority: User's matched city, fallback to COXIM
+  const initialFilter = matchedCity || 'COXIM';
+  const [activeFilter, setActiveFilter] = useState(initialFilter);
+
   // SS Form State
   const [nrSS, setNrSS] = useState('');
   const [tipoSS, setTipoSS] = useState<OccurrenceSS['tipo_ss']>('Atendimento de Chamada');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [guServico, setGuServico] = useState<string[]>([]);
+  const [roAddress, setRoAddress] = useState('');
 
   const tipos: OccurrenceSS['tipo_ss'][] = [
     'Rondas', 'Policiamento em evento', 'Policiamento Medidas Protetivas', 'Atendimento de Chamada'
@@ -30,7 +46,20 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
       const ssRef = collection(db, 'occurrences');
       const q = query(ssRef, orderBy('created_at', 'desc'));
       const snapshot = await getDocs(q);
-      const sss = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OccurrenceSS));
+      let sss = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OccurrenceSS));
+      
+      if (activeFilter !== 'TODOS') {
+        const normalizedActiveFilter = activeFilter.toUpperCase().replace(/[\s/]+/g, '');
+        sss = sss.filter(ss => {
+          const ssCidade = (ss.cidade || '').toUpperCase().replace(/[\s/]+/g, '');
+          const ssUnidade = (ss.unidade || '').toUpperCase().replace(/[\s/]+/g, '');
+          
+          return ssCidade === normalizedActiveFilter || 
+                 ssUnidade.includes(normalizedActiveFilter) ||
+                 (normalizedActiveFilter.includes('RIOVERDE') && (ssCidade.includes('RIOVERDE') || ssUnidade.includes('RIOVERDE')));
+        });
+      }
+      
       setOccurrencesSS(sss);
     } catch (err) {
       console.error('Erro ao buscar SSs:', err);
@@ -39,7 +68,7 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
 
   useEffect(() => {
     fetchSSs();
-  }, []);
+  }, [activeFilter]);
 
   const handleSubmitSS = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +84,10 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
         await updateDoc(doc(db, 'occurrences', editingSS.id), {
           nr_ss: nrSS,
           tipo_ss: tipoSS,
+          date: date,
+          time: time,
+          gu_servico: guServico,
+          roAddress: roAddress
         });
         await logAction(user.id, user.nome, 'UPDATE_SS', `Editou S.S Nr: ${nrSS}`);
         setAlertMessage('S.S atualizada com sucesso!');
@@ -62,18 +95,28 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
         const docData: Omit<OccurrenceSS, 'id'> = {
           nr_ss: nrSS,
           tipo_ss: tipoSS,
-          gu_servico: [],
+          date: date,
+          time: time,
+          gu_servico: guServico,
+          roAddress: roAddress,
           unidade: user.unidade,
           criado_por: user.nome,
           created_at: new Date().toISOString()
         };
-        await addDoc(collection(db, 'occurrences'), docData);
+        await addDoc(collection(db, 'occurrences'), {
+          ...docData,
+          cidade: activeFilter !== 'TODOS' ? activeFilter : (matchedCity || 'N/I')
+        });
         await logAction(user.id, user.nome, 'CREATE_SS', `Criou S.S Nr: ${nrSS} - Tipo: ${tipoSS}`);
         setAlertMessage('S.S registrado com sucesso!');
       }
       setShowSSModal(false);
       setEditingSS(null);
       setNrSS('');
+      setDate('');
+      setTime('');
+      setGuServico([]);
+      setRoAddress('');
       fetchSSs();
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'occurrences');
@@ -102,6 +145,10 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
     setEditingSS(ss);
     setNrSS(ss.nr_ss);
     setTipoSS(ss.tipo_ss);
+    setDate(ss.date || '');
+    setTime(ss.time || '');
+    setGuServico(ss.gu_servico || []);
+    setRoAddress(ss.roAddress || '');
     setShowSSModal(true);
   };
 
@@ -116,12 +163,35 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
           <h2 className="text-navy-950 text-3xl font-black uppercase tracking-tighter">Lista de S.S</h2>
           <p className="text-navy-500 mt-1 uppercase text-xs font-bold tracking-widest">Solicitações de Serviço Realizadas</p>
         </div>
+
         <button 
           onClick={() => { setEditingSS(null); setNrSS(''); setShowSSModal(true); }}
           className="bg-navy-700 hover:bg-navy-800 text-white font-black uppercase py-3 px-6 rounded-2xl shadow-xl shadow-navy-700/20 transition-all flex items-center gap-2"
         >
           <Plus size={20} /> Incluir S.S
         </button>
+      </div>
+
+      {/* City Filters */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+        <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest px-1">Filtrar por Cidade:</label>
+        <div className="relative flex-1 max-w-xs">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value)}
+            className="w-full bg-white border-2 border-navy-100 rounded-xl px-4 py-3 text-sm font-bold text-navy-900 outline-none focus:ring-2 focus:ring-navy-900 focus:border-navy-900 appearance-none transition-all"
+          >
+            {isAdmin && <option value="TODOS">TODAS AS CIDADES</option>}
+            {allowedCities.map(city => (
+              <option key={city} value={city} disabled={!isAdmin && matchedCity !== city}>
+                {city}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-navy-400">
+            <i className="fas fa-chevron-down"></i>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -135,7 +205,18 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
               {ss.date && ss.time && (
                 <p className="text-xs text-navy-500 mt-1">Data/Hora: {ss.date} - {ss.time}</p>
               )}
-              <p className="text-xs text-navy-400 mt-1">Criado por: {ss.criado_por}</p>
+              {ss.roAddress && (
+                <p className="text-xs text-navy-800 mt-1 font-medium bg-navy-50/50 px-2 py-1 rounded-lg border border-navy-100 flex items-center gap-1.5">
+                  <MapPin size={10} className="text-navy-400" />
+                  {ss.roAddress}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 mt-2">
+                <p className="text-xs text-navy-400 flex items-center gap-1 bg-navy-50 px-2 py-0.5 rounded">
+                  <MapPin size={10} /> {ss.cidade || 'N/I'}
+                </p>
+                <p className="text-xs text-navy-400">Criado por: {ss.criado_por}</p>
+              </div>
             </div>
             <div className="flex gap-2">
               <button onClick={() => openEditModal(ss)} className="p-2 text-navy-500 hover:text-navy-900"><Edit2 size={18} /></button>
@@ -159,17 +240,39 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
               </button>
             </div>
             
-            <form onSubmit={handleSubmitSS} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-1">Nr. da S.S</label>
-                <input 
-                  type="text"
-                  value={nrSS}
-                  onChange={(e) => setNrSS(e.target.value)}
-                  className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-900 font-bold focus:ring-2 focus:ring-navy-600 outline-none transition-all"
-                  placeholder="Ex: 1234567890"
-                  required
-                />
+            <form onSubmit={handleSubmitSS} className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-1">Nr. da S.S</label>
+                  <input 
+                    type="text"
+                    value={nrSS}
+                    onChange={(e) => setNrSS(e.target.value)}
+                    className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-900 font-bold focus:ring-2 focus:ring-navy-600 outline-none transition-all"
+                    placeholder="Ex: 1234567890"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-1">Data</label>
+                  <input 
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-900 font-bold focus:ring-2 focus:ring-navy-600 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-1">Horário</label>
+                  <input 
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-900 font-bold focus:ring-2 focus:ring-navy-600 outline-none transition-all"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -185,10 +288,47 @@ const SSList: React.FC<SSListProps> = ({ user }) => {
                 </select>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-1">Endereço (Local da Ocorrência)</label>
+                <input 
+                  type="text"
+                  value={roAddress}
+                  onChange={(e) => setRoAddress(e.target.value)}
+                  className="w-full bg-navy-50 border border-navy-100 rounded-2xl px-5 py-4 text-navy-900 font-bold focus:ring-2 focus:ring-navy-600 outline-none transition-all"
+                  placeholder="Ex: Av. Principal, 123"
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Guarnição de Serviço</label>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const name = window.prompt('Nome do Operador:');
+                      if (name) setGuServico([...guServico, name.toUpperCase()]);
+                    }}
+                    className="text-navy-700 font-black text-[9px] uppercase tracking-wider hover:underline"
+                  >
+                    + Adicionar
+                  </button>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  {guServico.map((m, i) => (
+                    <span key={i} className="bg-navy-50 text-navy-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 border border-navy-100">
+                      {m}
+                      <button type="button" onClick={() => setGuServico(guServico.filter((_, idx) => idx !== i))}><X size={12} /></button>
+                    </span>
+                  ))}
+                  {guServico.length === 0 && <p className="text-[10px] text-navy-300 font-bold uppercase italic p-2">Nenhum operador adicionado</p>}
+                </div>
+              </div>
+
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-navy-700 hover:bg-navy-800 text-white font-black uppercase py-5 rounded-2xl shadow-xl shadow-navy-700/20 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                className="w-full bg-navy-700 hover:bg-navy-800 text-white font-black uppercase py-5 rounded-2xl shadow-xl shadow-navy-700/20 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 mt-4"
               >
                 {isSubmitting ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
