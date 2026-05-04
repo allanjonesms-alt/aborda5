@@ -12,7 +12,7 @@ interface IndividualsListProps {
   user: User | null;
 }
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE = 52;
 
 const IndividualSkeleton = () => (
   <div className="bg-white border border-navy-100 rounded-3xl h-[110px] sm:h-[180px] animate-pulse overflow-hidden flex flex-col p-4 sm:p-5 space-y-3">
@@ -261,7 +261,6 @@ const IndividualsList: React.FC<IndividualsListProps> = ({ user }) => {
       }
       
       lastDocRef.current = snapshot.docs[snapshot.docs.length - 1];
-      setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
     } catch (err: any) {
       console.error('Error fetching individuals:', err);
       let errorMessage = 'Erro ao carregar indivíduos. Tente novamente.';
